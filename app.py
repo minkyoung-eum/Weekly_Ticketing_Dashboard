@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import datetime
 import os
 
-# 1. Streamlit 테마 설정 자동 생성 (.streamlit/config.toml) - 붉은색(Primary Color) 근본적 제거
+# 1. Streamlit 테마 설정 자동 생성 (.streamlit/config.toml) - 붉은색 테마 제거
 os.makedirs(".streamlit", exist_ok=True)
 config_path = os.path.join(".streamlit", "config.toml")
 if not os.path.exists(config_path):
@@ -42,7 +42,7 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# Custom CSS Styling (Soft Blue & Highlight)
+# Custom CSS Styling
 st.markdown("""
 <style>
     /* 전체 사이드바 배경 및 텍스트 색상 */
@@ -213,6 +213,18 @@ with col_mode2:
 
 dashboard_mode = st.session_state.active_mode
 ALL_OPTION = "전체 (All)"
+
+# Helper function to convert HHMM integer to datetime string for timeline
+def format_dep_time(dep_val):
+    try:
+        val_str = str(int(dep_val)).zfill(4)
+        hh = int(val_str[:2])
+        mm = int(val_str[2:])
+        if hh >= 24: hh = 23
+        if mm >= 60: mm = 59
+        return f"2026-08-01 {hh:02d}:{mm:02d}:00", f"2026-08-01 {(hh+2)%24:02d}:{mm:02d}:00"
+    except:
+        return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
 # ==========================================
 # MODE 1: 발매 M/S 대시보드
@@ -453,6 +465,7 @@ else:
 
     color_discrete_map = {'KE': '#00A1E9'}
 
+    # Top KPI Cards
     col_s1, col_s2, col_s3, col_s4 = st.columns(4)
     total_seats = filtered_sup['Seats_num'].sum()
     total_flights = filtered_sup['Flights_num'].sum()
@@ -536,32 +549,50 @@ else:
                     fig_s4.update_layout(yaxis_title=f"공급 ({'좌석수' if '공급석' in metric_mode else '편수'})")
                     st.plotly_chart(fig_s4, use_container_width=True)
 
+            # 5. [Gantt Schedule Timeline Bar Chart] 노선별 항공사 운항 시간대 스케줄 타임라인 차트
             st.markdown("---")
-            st.subheader("🎯 특정 노선 선택 및 시간대별 공급 분석")
+            st.subheader("✈️ 노선 선택 및 항공사별 운항 스케줄 타임라인 차트")
             available_routes = sorted(filtered_sup['노선'].dropna().unique().tolist())
             if available_routes:
                 col_sel_route, _ = st.columns([2, 2])
                 with col_sel_route:
-                    selected_single_route = st.selectbox("📌 분석할 노선을 선택하세요:", options=available_routes)
+                    selected_single_route = st.selectbox("📌 스케줄을 조회할 노선을 선택하세요:", options=available_routes)
                 
-                df_route_time = filtered_sup[filtered_sup['노선'] == selected_single_route]
-                if not df_route_time.empty and '출발 시간대' in df_route_time.columns:
-                    df_rt_grp = df_route_time.groupby(['Airline', '출발 시간대'])[target_val].sum().reset_index()
-                    rt_al_order = [al for al in sup_airlines if al in df_rt_grp['Airline'].unique()]
+                df_schedule = filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
+                if not df_schedule.empty and 'Dep Time' in df_schedule.columns:
+                    # Dep Time 포맷팅 (Start / Finish)
+                    time_tuples = df_schedule['Dep Time'].apply(format_dep_time)
+                    df_schedule['Start_Time'] = [t[0] for t in time_tuples]
+                    df_schedule['End_Time'] = [t[1] for t in time_tuples]
                     
-                    fig_s5 = px.bar(
-                        df_rt_grp, x='Airline', y=target_val, color='출발 시간대',
-                        title=f'5. [{selected_single_route}] 노선 - 항공사별 출발 시간대 공급 분포 ({metric_mode.split()[0]})',
-                        barmode='stack', text=target_val,
-                        category_orders={'Airline': rt_al_order},
-                        color_discrete_sequence=px.colors.qualitative.Pastel
+                    # Flight Labeling
+                    if 'Flights' in df_schedule.columns:
+                        df_schedule['Flight_Label'] = df_schedule['Airline'] + " (" + df_schedule['Seats_num'].astype(str) + "석)"
+                    else:
+                        df_schedule['Flight_Label'] = df_schedule['Airline']
+
+                    fig_timeline = px.timeline(
+                        df_schedule,
+                        x_start="Start_Time", x_end="End_Time",
+                        y="Airline", color="Airline", text="Airline",
+                        title=f"5. [{selected_single_route}] 노선 하루 출발 시간대별 운항 스케줄 타임라인",
+                        color_discrete_map=color_discrete_map,
+                        category_orders={'Airline': sup_airlines}
                     )
-                    fig_s5.update_traces(
-                        texttemplate='%{text:,.0f}', textposition='inside',
-                        hovertemplate="<b>항공사: %{x}</b><br>시간대: %{fullData.name}<br>공급량: %{y:,.0f}<extra></extra>"
+                    
+                    fig_timeline.update_yaxes(autorange="reversed", title="항공사")
+                    fig_timeline.update_xaxes(
+                        title="하루 시간대 (00:00 ~ 24:00)",
+                        dtick=3600000, # 1시간 간격
+                        tickformat="%H:%M"
                     )
-                    fig_s5.update_layout(xaxis_title="항공사", yaxis_title=f"공급 ({'좌석수' if '공급석' in metric_mode else '편수'})")
-                    st.plotly_chart(fig_s5, use_container_width=True)
+                    fig_timeline.update_traces(
+                        textposition='inside',
+                        hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{x}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>",
+                        customdata=df_schedule[['Seats_num']]
+                    )
+                    fig_timeline.update_layout(height=400, showlegend=True)
+                    st.plotly_chart(fig_timeline, use_container_width=True)
 
     with tab_s2:
         st.markdown(f"##### 📌 노선 및 출발월별 공급 M/S 매트릭스 ({metric_mode})")
