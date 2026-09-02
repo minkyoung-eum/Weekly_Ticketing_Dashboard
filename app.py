@@ -17,11 +17,11 @@ if "weight_df" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# 🚀 메모리 절약을 위한 데이터 캐싱 및 변환 함수
+# 🚀 메모리 절약형 데이터 캐싱 및 가공 함수
 # ---------------------------------------------------------
-@st.cache_data(show_spinner=False)
+@st.cache_data(max_entries=2, show_spinner=False)
 def load_uploaded_file(file_bytes, filename):
-    """파일 업로드 시 메모리 사용량을 절약하며 불러오기"""
+    """파일 업로드 시 메모리를 절약하며 불러오기"""
     if filename.endswith(".csv"):
         df = pd.read_csv(io.BytesIO(file_bytes))
     else:
@@ -102,7 +102,7 @@ with col_up2:
 if st.session_state["raw_df"] is not None:
     df = st.session_state["raw_df"].copy()
 
-    with st.spinner("데이터 메모리를 최적화하고 처리하는 중입니다..."):
+    with st.spinner("데이터를 최적화하고 처리하는 중입니다..."):
         # 1. Purchase Week 생성
         if "Ticket Purchase Date" in df.columns:
             df["Purchase Week"] = df["Ticket Purchase Date"].apply(get_iso_month_week)
@@ -178,7 +178,19 @@ if st.session_state["raw_df"] is not None:
 
             df["Sales Channel"] = df[source_col].apply(classify_sales_channel)
 
-        # 6. 가중치(Weight) 매핑 및 추정 건수 계산
+        # 6. 출발월(00월) 필드 가공
+        if "Ticket Travel Month" in df.columns:
+            def format_month(val):
+                if pd.isna(val):
+                    return ""
+                try:
+                    m = int(float(val))
+                    return f"{m:02d}월"
+                except:
+                    return str(val)
+            df["출발월"] = df["Ticket Travel Month"].apply(format_month)
+
+        # 7. 가중치(Weight) 매핑 및 안전한 숫자형 변환 (에러 방지 핵심)
         airline_col = "Dominant Marketing Airline"
         df["Weight"] = 1.0
 
@@ -194,12 +206,16 @@ if st.session_state["raw_df"] is not None:
                 weight_df_sub = weight_df[[w_route_col, w_air_col, w_val_col]].dropna()
                 weight_df_sub.columns = ["Route Code", airline_col, "Weight_Val"]
 
+                # 가중치 수치 강제 숫자 변환
+                weight_df_sub["Weight_Val"] = pd.to_numeric(weight_df_sub["Weight_Val"], errors="coerce").fillna(1.0)
+
                 df = df.merge(weight_df_sub, on=["Route Code", airline_col], how="left")
-                df["Weight"] = df["Weight_Val"].fillna(1.0)
+                df["Weight"] = pd.to_numeric(df["Weight_Val"], errors="coerce").fillna(1.0)
                 df.drop(columns=["Weight_Val"], inplace=True, errors="ignore")
                 st.sidebar.info("💡 가중치 테이블 적용 완료")
 
-        df["Estimated Count"] = df["Weight"]
+        # Estimated Count를 강제로 float 수치형으로 보장하여 .sum() TypeError 방지
+        df["Estimated Count"] = pd.to_numeric(df["Weight"], errors="coerce").fillna(1.0)
 
     # ---------------------------------------------------------
     # 🎛️ 좌측 사이드바 슬라이서 (Pills 방식)
@@ -285,19 +301,19 @@ if st.session_state["raw_df"] is not None:
         if selected_bounds and "전체" not in selected_bounds:
             filtered_df = filtered_df[filtered_df["Bound"].isin(selected_bounds)]
 
-    # 6. Ticket Travel Month 필터
-    if "Ticket Travel Month" in filtered_df.columns:
-        st.sidebar.markdown("**6. Ticket Travel Month (여행 월)**")
-        months = sorted(filtered_df["Ticket Travel Month"].dropna().unique().tolist())
+    # 6. 출발월 필터 (00월 형식)
+    if "출발월" in filtered_df.columns:
+        st.sidebar.markdown("**6. 출발월**")
+        months = sorted([m for m in filtered_df["출발월"].dropna().unique().tolist() if m != ""])
         selected_months = st.sidebar.pills(
-            "Ticket Travel Month 선택",
+            "출발월 선택",
             options=["전체"] + months,
             selection_mode="multi",
             default=["전체"],
             label_visibility="collapsed"
         )
         if selected_months and "전체" not in selected_months:
-            filtered_df = filtered_df[filtered_df["Ticket Travel Month"].isin(selected_months)]
+            filtered_df = filtered_df[filtered_df["출발월"].isin(selected_months)]
 
     # 7. Time Slot 필터
     if "Time Slot" in filtered_df.columns:
@@ -318,21 +334,8 @@ if st.session_state["raw_df"] is not None:
     # ---------------------------------------------------------
     st.success(f"✅ 데이터 분석 준비 완료 (적용 건수: {len(filtered_df):,} 건)")
 
-    total_raw_count = len(filtered_df)
-    total_est_count = filtered_df["Estimated Count"].sum()
-
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("RAW 실적 건수", f"{total_raw_count:,} 건")
-    with col2:
-        st.metric("가중치 반영 추정 건수", f"{total_est_count:,.1f} 건")
-    with col3:
-        if "Route Code" in filtered_df.columns:
-            st.metric("분석 대상 노선 수", f"{filtered_df['Route Code'].nunique()} 개")
-    with col4:
-        if "Sales Channel" in filtered_df.columns:
-            direct_c = (filtered_df["Sales Channel"] == "직판").sum()
-            st.metric("직판 건수", f"{direct_c:,} 건")
+    # 안전하게 float 타입으로 sum 구하기
+    total_est_count = float(filtered_df["Estimated Count"].sum())
 
     st.divider()
 
@@ -375,7 +378,7 @@ if st.session_state["raw_df"] is not None:
 
                 plot_df = plot_series.reset_index()
                 plot_df.columns = [airline_col, "추정 발권 건수"]
-                plot_df["점유율(%)"] = (plot_df["추정 발권 건수"] / total_est_count * 100).round(1)
+                plot_df["점유율(%)"] = (plot_df["추정 발권 건수"] / (total_est_count if total_est_count > 0 else 1) * 100).round(1)
 
                 fig = px.bar(
                     plot_df,
@@ -493,6 +496,7 @@ if st.session_state["raw_df"] is not None:
             "Route Code",
             "KE 취항 여부",
             "Sales Channel",
+            "출발월",
             "Weight",
             "Estimated Count",
             "Purchase Week",
@@ -504,9 +508,8 @@ if st.session_state["raw_df"] is not None:
     other_cols = [c for c in filtered_df.columns if c not in new_cols]
     final_df = filtered_df[new_cols + other_cols]
 
-    # 미리보기 100건 제한으로 브라우저 메모리 부하 방지
-    st.dataframe(final_df.head(100), width="stretch")
-    st.caption("※ 데이터 미리보기는 메모리 보호를 위해 상위 100건만 표출됩니다. 전체 데이터는 아래 버튼으로 다운로드하세요.")
+    st.dataframe(final_df.head(50), width="stretch")
+    st.caption("※ 화면 튕김 방지를 위해 미리보기는 상위 50건만 표출됩니다. 전체 데이터는 아래 엑셀 다운로드 버튼을 이용하세요.")
 
     st.subheader("📥 필터 및 추정 반영 데이터 엑셀 다운로드")
     output = io.BytesIO()
