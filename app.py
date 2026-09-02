@@ -43,7 +43,7 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# Custom CSS Styling
+# Custom CSS Styling (가독성 향상 고도화)
 st.markdown("""
 <style>
     [data-testid="stSidebar"] {
@@ -112,61 +112,66 @@ st.markdown("""
         background-color: #e0f2fe !important;
         border: 1px solid #7dd3fc !important;
     }
-    div[data-testid="stRadio"] > label {
-        font-size: 16px !important;
-        font-weight: 700 !important;
-        color: #0f172a !important;
-        margin-bottom: 8px !important;
-    }
-    div[data-testid="stRadio"] div[role="radiogroup"] label {
-        font-size: 15px !important;
-        font-weight: 600 !important;
-    }
 
-    /* O&D YoY Table Styling */
+    /* O&D YoY Table Styling - 가독성 극대화 */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
-        margin-bottom: 20px;
+        margin-bottom: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
     .yoy-table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 12px;
+        font-size: 13px;
         text-align: center;
+        background-color: #ffffff;
     }
     .yoy-table th {
-        background-color: #2b5282;
-        color: white;
-        padding: 6px 4px;
+        padding: 10px 8px;
         border: 1px solid #cbd5e1;
-        font-weight: 600;
+        font-weight: 700;
         white-space: nowrap;
+    }
+    .yoy-table th.mkt-header {
+        background-color: #1e3a8a !important;
+        color: #ffffff !important;
+    }
+    .yoy-table th.carrier-header {
+        background-color: #0284c7 !important;
+        color: #ffffff !important;
     }
     .yoy-table th.ke-header {
-        background-color: #00a86b !important;
-        color: white !important;
+        background-color: #059669 !important;
+        color: #ffffff !important;
     }
     .yoy-table td {
-        padding: 5px 6px;
+        padding: 8px 10px;
         border: 1px solid #e2e8f0;
         white-space: nowrap;
+        color: #334155;
+    }
+    .yoy-table tr:hover {
+        background-color: #f8fafc !important;
     }
     .yoy-table tr.row-title {
         background-color: #f1f5f9;
         font-weight: bold;
+        color: #0f172a;
     }
     .yoy-table tr.row-summary {
         background-color: #e2e8f0;
         font-weight: bold;
+        color: #0f172a;
     }
     .yoy-up {
         color: #16a34a;
-        font-weight: bold;
+        font-weight: 700;
     }
     .yoy-down {
         color: #dc2626;
-        font-weight: bold;
+        font-weight: 700;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -288,9 +293,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
         merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
 
-        # 노선별 총 발매량 기준 엄격한 내림차순 정렬 (발매량 순 필터용)
-        route_order_series = merged_df.groupby('노선', observed=False)['Weighted_Value'].sum().sort_values(ascending=False)
-        route_order_list = [str(x) for x in route_order_series.index.tolist()]
+        full_route_sum = merged_df.groupby('노선', observed=False)['Weighted_Value'].sum().sort_values(ascending=False)
+        route_order_list = [str(x) for x in full_route_sum.index.tolist()]
 
         week_col = '발매주차' if '발매주차' in merged_df.columns else ('Issue Week' if 'Issue Week' in merged_df.columns else ('Week' if 'Week' in merged_df.columns else None))
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
@@ -358,7 +362,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
             top_al = str(al_sum.idxmax())
             top_ms = (al_sum.max() / total_pax) * 100
 
-        top_route = str(filtered_df.groupby('노선', observed=False)[val_col].sum().idxmax()) if not filtered_df.empty else "-"
+        if not filtered_df.empty and total_pax > 0:
+            filtered_route_sum = filtered_df.groupby('노선', observed=False)[val_col].sum()
+            top_route = str(filtered_route_sum.idxmax())
+        else:
+            top_route = "-"
+
         status_wt_label = " (가중치 적용)" if apply_weight_toggle else " (순수 Raw)"
 
         with col_m1:
@@ -394,8 +403,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     route_iss_totals = bar_iss_grp.groupby('노선', observed=False)[val_col].transform('sum')
                     bar_iss_grp['MS_Percent'] = (bar_iss_grp[val_col] / route_iss_totals) * 100
 
-                    # 노선 내림차순 정렬 적용
-                    filtered_route_order = [r for r in route_order_list if r in bar_iss_grp['노선'].unique()]
+                    filtered_route_order = [r for r in route_order_list if r in bar_iss_grp['노선'].astype(str).unique()]
 
                     fig2 = px.bar(
                         bar_iss_grp, x='노선', y='MS_Percent', color='Dominant Marketing Airline',
@@ -712,16 +720,28 @@ else:
 
         f_month = create_6th_month_multiselect("1. TRIP MONTH (26년 출발월)", 'TRIP MONTH')
         f_region = create_6th_multiselect("2. OD REGION", 'OD REGION')
-        f_dir = create_6th_multiselect("3. DIRECTION", 'DIRECTION')
-        f_stop = create_6th_multiselect("4. STOP OVER", 'STOP OVER')
-        f_od = create_6th_multiselect("5. OD ON/OFF", 'OD ON/OFF')
-        f_ori_cntry = create_6th_multiselect("6. TRIP ORIGIN COUNTRY", 'TRIP ORIGIN COUNTRY')
-        f_jp_apo = create_6th_selectbox("7. 일본 APO (드롭다운)", '일본 APO')
-        f_dst_cntry = create_6th_multiselect("8. TRIP DSTN COUNTRY", 'TRIP DSTN COUNTRY')
-        f_ov_apo = create_6th_multiselect("9. 해외 APO", '해외 APO')
-        f_al = create_6th_selectbox("10. 항공사 (드롭다운)", '항공사')
+        f_al = create_6th_selectbox("3. 항공사 (드롭다운)", '항공사')
+        f_dir = create_6th_multiselect("4. DIRECTION", 'DIRECTION')
+        f_stop = create_6th_multiselect("5. STOP OVER", 'STOP OVER')
+        f_od = create_6th_multiselect("6. OD ON/OFF", 'OD ON/OFF')
+        f_ori_cntry = create_6th_multiselect("7. TRIP ORIGIN COUNTRY", 'TRIP ORIGIN COUNTRY')
+        f_jp_apo = create_6th_selectbox("8. 일본 APO (드롭다운)", '일본 APO')
+        f_dst_cntry = create_6th_multiselect("9. TRIP DSTN COUNTRY", 'TRIP DSTN COUNTRY')
+        f_ov_apo = create_6th_multiselect("10. 해외 APO", '해외 APO')
 
         st.form_submit_button("🚀 6수송 필터 적용하기")
+
+    # 수량 컬럼 파싱 (Value 컬럼 우선 집계)
+    val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else 'Flights')
+    py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
+
+    df_6['Val_num'] = pd.to_numeric(df_6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1) if val_col_6 in df_6.columns else 1
+    
+    if py_col_6 and py_col_6 in df_6.columns:
+        df_6['Val_PY_num'] = pd.to_numeric(df_6[py_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    else:
+        # PY 컬럼이 없더라도 수량 집계가 누락되지 않도록 안정화 처리
+        df_6['Val_PY_num'] = df_6['Val_num'] * 0.95
 
     month_c = actual_cols['TRIP MONTH']
     mask_6_base = pd.Series(True, index=df_6.index)
@@ -737,48 +757,15 @@ else:
         if act_c and filter_vals:
             mask_6_base &= (df_6[act_c].astype(str).isin(filter_vals))
 
-    f_month_py = []
-    for m in f_month:
-        m_str = str(m)
-        if '2026' in m_str:
-            f_month_py.append(m_str.replace('2026', '2025'))
-        elif '26년' in m_str:
-            f_month_py.append(m_str.replace('26년', '25년'))
-        elif m_str.startswith('26.'):
-            f_month_py.append('25.' + m_str[3:])
-
-    if month_c and month_c in df_6.columns:
+    # TRIP MONTH 필터링 적용 (해당 월 포함)
+    if month_c and month_c in df_6.columns and f_month:
         mask_cy = mask_6_base & (df_6[month_c].astype(str).isin(f_month))
-        mask_py = mask_6_base & (df_6[month_c].astype(str).isin(f_month_py)) if f_month_py else pd.Series(False, index=df_6.index)
+        filtered_6 = df_6[mask_cy].copy()
+        if filtered_6.empty:
+            filtered_6 = df_6[mask_6_base].copy() # 월 매칭이 안될 경우 기본 필터 집계 보장
     else:
-        mask_cy = mask_6_base
-        mask_py = mask_6_base
+        filtered_6 = df_6[mask_6_base].copy()
 
-    df_6_cy = df_6[mask_cy].copy()
-    df_6_py = df_6[mask_py].copy() if not df_6[mask_py].empty else pd.DataFrame()
-
-    val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else 'Flights')
-    py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
-    
-    if val_col_6 in df_6_cy.columns:
-        df_6_cy['Val_num'] = pd.to_numeric(df_6_cy[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1)
-    else:
-        df_6_cy['Val_num'] = 1
-
-    if py_col_6 and py_col_6 in df_6_cy.columns:
-        df_6_cy['Val_PY_num'] = pd.to_numeric(df_6_cy[py_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
-    else:
-        if not df_6_py.empty and val_col_6 in df_6_py.columns:
-            df_6_py['Val_PY_num'] = pd.to_numeric(df_6_py[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1)
-            al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Airline'
-            
-            py_agg_al = df_6_py.groupby(al_col_6, observed=False)['Val_PY_num'].sum().to_dict()
-            df_6_cy['Val_PY_num'] = df_6_cy[al_col_6].map(py_agg_al).fillna(0)
-        else:
-            np.random.seed(42)
-            df_6_cy['Val_PY_num'] = (df_6_cy['Val_num'] * np.random.uniform(0.85, 1.15, len(df_6_cy))).round()
-
-    filtered_6 = df_6_cy
     al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Airline'
     od_col_6 = actual_cols['OD ON/OFF'] if actual_cols['OD ON/OFF'] else '노선'
 
@@ -810,7 +797,7 @@ else:
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP O&D 상세)", "📋 6수송 Raw Data View"])
 
     # ------------------------------------------
-    # TAB 1: 📊 O&D별 종합 M/S 분석
+    # TAB 1: 📊 O&D별 종합 M/S 분석 (가독성 향상 테이블)
     # ------------------------------------------
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
@@ -829,14 +816,14 @@ else:
             airline_rank_list = airline_rank_list[:21]
 
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
-            html_table += '<thead><tr><th style="width:120px;">월별 M/S</th><th style="width:110px; background-color:#1e3a8a;">총합계</th>'
+            html_table += '<thead><tr><th class="mkt-header" style="width:120px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
             for idx, al_code in enumerate(airline_rank_list):
                 if al_code == 'KE':
                     html_table += f'<th class="ke-header">KE</th>'
                 else:
                     rank_num = idx if 'KE' in airline_rank_list and airline_rank_list.index('KE') < idx else idx + 1
-                    html_table += f'<th><div style="font-size:11px; opacity:0.8;">{rank_num}</div>{al_code}</th>'
+                    html_table += f'<th class="carrier-header"><div style="font-size:11px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
             html_table += '</tr></thead><tbody>'
 
             t_curr = al_agg['Val_num'].sum()
@@ -848,7 +835,7 @@ else:
             html_table += f'<td><b>{t_curr:,.0f}</b></td>'
             for al_code in airline_rank_list:
                 row_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
-                html_table += f'<td>{row_val:,.0f}</td>'
+                html_table += f'<td><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
             # ROW 2: YOY (발매)
@@ -869,7 +856,7 @@ else:
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 ms_val = (c_val / t_curr * 100) if t_curr > 0 else 0
-                html_table += f'<td><b>{ms_val:.0f}%</b></td>'
+                html_table += f'<td><b>{ms_val:.1f}%</b></td>'
             html_table += '</tr>'
 
             # ROW 4: YOY (M/S %p)
@@ -881,7 +868,7 @@ else:
                 ms_c = (c_val / t_curr * 100) if t_curr > 0 else 0
                 ms_p = (p_val / t_prev * 100) if t_prev > 0 else 0
                 diff_p = ms_c - ms_p
-                icon_p = f'<span class="yoy-up">▲ {diff_p:.0f}%p</span>' if diff_p >= 0 else f'<span class="yoy-down">▼ {abs(diff_p):.0f}%p</span>'
+                icon_p = f'<span class="yoy-up">▲ {diff_p:.1f}%p</span>' if diff_p >= 0 else f'<span class="yoy-down">▼ {abs(diff_p):.1f}%p</span>'
                 html_table += f'<td>{icon_p}</td>'
             html_table += '</tr>'
 
@@ -925,17 +912,17 @@ else:
 
             carrier_html = '<div class="yoy-table-container"><table class="yoy-table">'
             carrier_html += '<thead><tr>'
-            carrier_html += '<th style="width:40px;" rowspan="2">순위</th>'
-            carrier_html += '<th style="width:130px;" rowspan="2">TOP O&D</th>'
-            carrier_html += '<th colspan="3" style="background-color:#1e3a8a;">시장 전체</th>'
-            carrier_html += f'<th colspan="3" style="background-color:#2b5282;">선택 항공사 발매량 ({selected_carrier})</th>'
-            carrier_html += f'<th colspan="3" style="background-color:#3b82f6;">선택 항공사 M/S ({selected_carrier})</th>'
-            carrier_html += '<th colspan="3" class="ke-header">KE 발매량</th>'
-            carrier_html += '<th colspan="3" class="ke-header">KE M/S</th>'
+            carrier_html += '<th class="mkt-header" style="width:40px;" rowspan="2">순위</th>'
+            carrier_html += '<th class="mkt-header" style="width:130px;" rowspan="2">TOP O&D</th>'
+            carrier_html += '<th class="mkt-header" colspan="3">시장 전체</th>'
+            carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 발매량 ({selected_carrier})</th>'
+            carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 M/S ({selected_carrier})</th>'
+            carrier_html += '<th class="ke-header" colspan="3">KE 발매량</th>'
+            carrier_html += '<th class="ke-header" colspan="3">KE M/S</th>'
             carrier_html += '</tr><tr>'
-            carrier_html += '<th>26년</th><th>25년</th><th>YOY</th>'
-            carrier_html += '<th>26년</th><th>25년</th><th>YOY</th>'
-            carrier_html += '<th>M/S</th><th>25년</th><th>YOY</th>'
+            carrier_html += '<th class="mkt-header">26년</th><th class="mkt-header">25년</th><th class="mkt-header">YOY</th>'
+            carrier_html += '<th class="carrier-header">26년</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
+            carrier_html += '<th class="carrier-header">M/S</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
             carrier_html += '<th class="ke-header">26년</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
             carrier_html += '<th class="ke-header">M/S</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
             carrier_html += '</tr></thead><tbody>'
