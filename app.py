@@ -16,7 +16,19 @@ if "weight_df" not in st.session_state:
     st.session_state["weight_df"] = None
 
 
-# 1. 목요일 기준 ISO-8601 X월 X주차 계산 함수
+# ---------------------------------------------------------
+# 🚀 메모리 절약을 위한 데이터 캐싱 및 변환 함수
+# ---------------------------------------------------------
+@st.cache_data(show_spinner=False)
+def load_uploaded_file(file_bytes, filename):
+    """파일 업로드 시 메모리 사용량을 절약하며 불러오기"""
+    if filename.endswith(".csv"):
+        df = pd.read_csv(io.BytesIO(file_bytes))
+    else:
+        df = pd.read_excel(io.BytesIO(file_bytes))
+    return df
+
+
 def get_iso_month_week(date):
     if pd.isna(date):
         return ""
@@ -32,7 +44,6 @@ def get_iso_month_week(date):
         return ""
 
 
-# 2. Flight Departure Time 시간대 구분 함수
 def classify_flight_time(time_val):
     if pd.isna(time_val):
         return "기타"
@@ -62,28 +73,9 @@ def classify_flight_time(time_val):
 
 # KE 취항 노선 목록 정의
 KE_ROUTES = {
-    "G/HND",
-    "I/NRT",
-    "I/HND",
-    "P/NRT",
-    "C/NRT",
-    "I/KIX",
-    "G/KIX",
-    "I/UKB",
-    "I/OKJ",
-    "I/HIJ",
-    "I/FUK",
-    "I/KOJ",
-    "I/NGS",
-    "I/KMJ",
-    "I/OIT",
-    "I/NGO",
-    "P/NGO",
-    "I/KIJ",
-    "I/KMQ",
-    "I/OKA",
-    "I/CTS",
-    "I/AOJ",
+    "G/HND", "I/NRT", "I/HND", "P/NRT", "C/NRT", "I/KIX", "G/KIX", "I/UKB",
+    "I/OKJ", "I/HIJ", "I/FUK", "I/KOJ", "I/NGS", "I/KMJ", "I/OIT", "I/NGO",
+    "P/NGO", "I/KIJ", "I/KMQ", "I/OKA", "I/CTS", "I/AOJ"
 }
 
 
@@ -96,27 +88,21 @@ with col_up1:
         "1. RAW DATA 파일 (.xlsx / .csv)", type=["xlsx", "csv"], key="uploader_raw"
     )
     if uploaded_file is not None:
-        if uploaded_file.name.endswith(".csv"):
-            st.session_state["raw_df"] = pd.read_csv(uploaded_file)
-        else:
-            st.session_state["raw_df"] = pd.read_excel(uploaded_file)
+        st.session_state["raw_df"] = load_uploaded_file(uploaded_file.getvalue(), uploaded_file.name)
 
 with col_up2:
     weight_file = st.file_uploader(
         "2. 노선/항공사별 가중치 테이블 파일 (선택 사항)", type=["xlsx", "csv"], key="uploader_weight"
     )
     if weight_file is not None:
-        if weight_file.name.endswith(".csv"):
-            st.session_state["weight_df"] = pd.read_csv(weight_file)
-        else:
-            st.session_state["weight_df"] = pd.read_excel(weight_file)
+        st.session_state["weight_df"] = load_uploaded_file(weight_file.getvalue(), weight_file.name)
 
 
 # RAW DATA가 있을 때 가공 및 집계 로직 실행
 if st.session_state["raw_df"] is not None:
     df = st.session_state["raw_df"].copy()
 
-    with st.spinner("데이터를 처리하는 중입니다..."):
+    with st.spinner("데이터 메모리를 최적화하고 처리하는 중입니다..."):
         # 1. Purchase Week 생성
         if "Ticket Purchase Date" in df.columns:
             df["Purchase Week"] = df["Ticket Purchase Date"].apply(get_iso_month_week)
@@ -211,16 +197,16 @@ if st.session_state["raw_df"] is not None:
                 df = df.merge(weight_df_sub, on=["Route Code", airline_col], how="left")
                 df["Weight"] = df["Weight_Val"].fillna(1.0)
                 df.drop(columns=["Weight_Val"], inplace=True, errors="ignore")
-                st.sidebar.info("💡 노선/항공사별 가중치 테이블 적용 중")
+                st.sidebar.info("💡 가중치 테이블 적용 완료")
 
         df["Estimated Count"] = df["Weight"]
 
     # ---------------------------------------------------------
-    # 🎛️ 좌측 사이드바 슬라이서 (Pills / 나열형 버튼 방식)
+    # 🎛️ 좌측 사이드바 슬라이서 (Pills 방식)
     # ---------------------------------------------------------
     st.sidebar.header("🎛️ 대시보드 필터 (슬라이서)")
 
-    filtered_df = df.copy()
+    filtered_df = df
 
     # 1. KE 취항 여부 필터
     if "KE 취항 여부" in df.columns:
@@ -332,7 +318,6 @@ if st.session_state["raw_df"] is not None:
     # ---------------------------------------------------------
     st.success(f"✅ 데이터 분석 준비 완료 (적용 건수: {len(filtered_df):,} 건)")
 
-    # 요약 지표
     total_raw_count = len(filtered_df)
     total_est_count = filtered_df["Estimated Count"].sum()
 
@@ -462,7 +447,7 @@ if st.session_state["raw_df"] is not None:
     st.divider()
 
     # ---------------------------------------------------------
-    # 🍕 추가: Sales Channel & Bound 별 원 그래프 (Pie Chart)
+    # 🍕 Sales Channel & Bound 별 원 그래프 (Pie Chart)
     # ---------------------------------------------------------
     st.subheader("🍕 세부 비중 분석 (Sales Channel & Bound)")
     
@@ -519,7 +504,9 @@ if st.session_state["raw_df"] is not None:
     other_cols = [c for c in filtered_df.columns if c not in new_cols]
     final_df = filtered_df[new_cols + other_cols]
 
-    st.dataframe(final_df, width="stretch")
+    # 미리보기 100건 제한으로 브라우저 메모리 부하 방지
+    st.dataframe(final_df.head(100), width="stretch")
+    st.caption("※ 데이터 미리보기는 메모리 보호를 위해 상위 100건만 표출됩니다. 전체 데이터는 아래 버튼으로 다운로드하세요.")
 
     st.subheader("📥 필터 및 추정 반영 데이터 엑셀 다운로드")
     output = io.BytesIO()
