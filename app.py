@@ -289,7 +289,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df = df_iss_raw.copy()
         df_wt = df_wt_raw.copy()
 
-        # 원본 노선 컬럼 문자열형 고정
         df['노선'] = df['노선'].astype(str).str.strip()
 
         df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
@@ -307,10 +306,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
         merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
 
-        # 조인 후의 가중치 반영 발매실적 기준 노선 정렬 (내림차순)
-        full_route_sum = merged_df.groupby('노선', observed=False)['Weighted_Value'].sum().sort_values(ascending=False)
-        route_order_list = [str(x) for x in full_route_sum.index.tolist()]
-
         week_col = '발매주차' if '발매주차' in merged_df.columns else ('Issue Week' if 'Issue Week' in merged_df.columns else ('Week' if 'Week' in merged_df.columns else None))
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
 
@@ -325,11 +320,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
+        # 사이드바 필터 폼
         st.sidebar.markdown("---")
         st.sidebar.header("🔍 발매 대시보드 필터")
         with st.sidebar.form("iss_filter_form"):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             
+            # 토글 스위치 상태에 맞춰 노선 내림차순 목록 동적 정렬
+            target_metric = 'Weighted_Value' if apply_weight_toggle else 'Value'
+            full_route_sum = merged_df.groupby('노선', observed=False)[target_metric].sum().sort_values(ascending=False)
+            route_order_list = [str(x) for x in full_route_sum.index.tolist()]
+
             def get_form_selection(label, full_list, default_vals=None):
                 options = [ALL_OPTION] + full_list
                 default_choice = default_vals if default_vals is not None else [ALL_OPTION]
@@ -350,7 +351,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-        # 노선 완전 일치(Exact Match) 필터링
         filter_mask = (
             (merged_df['노선'].astype(str).isin(selected_routes)) &
             (merged_df['출발 월'].astype(str).isin(selected_dep_months)) &
@@ -378,7 +378,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             top_al = str(al_sum.idxmax())
             top_ms = (al_sum.max() / total_pax) * 100
 
-        # 최대 실적 노선: 필터 결과 중 최고 발매 실적 노선명 표출
+        # 선택된 필터 결과 내 동일 기준 1위 노선
         if not filtered_df.empty and total_pax > 0:
             filtered_route_sum = filtered_df.groupby('노선', observed=False)[val_col].sum()
             top_route = str(filtered_route_sum.idxmax())
