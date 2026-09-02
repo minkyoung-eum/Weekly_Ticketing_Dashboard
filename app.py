@@ -9,6 +9,11 @@ st.set_page_config(
     page_title="주차별 발매 분석 대시보드", layout="wide"
 )
 
+# ---------------------------------------------------------
+# 🔑 관리자 비밀번호 설정 (원하시는 비밀번호로 자유롭게 변경하세요)
+# ---------------------------------------------------------
+ADMIN_PASSWORD = "1234"
+
 # 세션 상태 초기화
 if "raw_df" not in st.session_state:
     st.session_state["raw_df"] = None
@@ -17,7 +22,7 @@ if "weight_df" not in st.session_state:
 
 
 # ---------------------------------------------------------
-# 🚀 메모리 및 처리 속도 최적화 함수
+# 🚀 메모리 절약 및 파일 로딩 함수
 # ---------------------------------------------------------
 @st.cache_data(max_entries=2, show_spinner=False)
 def load_uploaded_file(file_bytes, filename):
@@ -204,14 +209,14 @@ if st.session_state["raw_df"] is not None:
 
         df["Estimated Count"] = pd.to_numeric(df["Weight"], errors="coerce").fillna(1.0)
 
-        # 메모리 슬림화
+        # 메모리 다운캐스팅 (속도 최적화)
         cat_cols = ["KE 취항 여부", "Route Code", "Sales Channel", "Purchase Week", "Bound", "출발월", "Time Slot", airline_col]
         for col in cat_cols:
             if col in df.columns:
                 df[col] = df[col].astype("category")
 
     # ---------------------------------------------------------
-    # 🎛️ 사이드바 필터 (st.form으로 배치하여 버튼 누를 때만 연산)
+    # 🎛️ 사이드바 필터 설정 (st.form으로 메모리 부하 차단)
     # ---------------------------------------------------------
     st.sidebar.header("🎛️ 대시보드 필터 설정")
 
@@ -219,102 +224,94 @@ if st.session_state["raw_df"] is not None:
         # 1. KE 취항 여부
         ke_opt = "KE 취항 노선만"
         if "KE 취항 여부" in df.columns:
-            st.markdown("**1. KE 취항 여부**")
-            ke_opt = st.pills(
-                "KE 취항 여부 선택",
+            ke_opt = st.radio(
+                "1. KE 취항 여부",
                 ["전체", "KE 취항 노선만", "KE 미취항 노선만"],
-                default="KE 취항 노선만",
-                label_visibility="collapsed"
+                index=1
             )
 
         # 2. Route Code
         selected_routes = []
         if "Route Code" in df.columns:
-            st.markdown("**2. Route Code (노선 선택)**")
             route_counts = df["Route Code"].value_counts()
             ke_routes_sorted = [str(r) for r in route_counts.index if str(r) in KE_ROUTES]
             non_ke_routes_sorted = [str(r) for r in route_counts.index if str(r) not in KE_ROUTES]
             available_routes = ke_routes_sorted + non_ke_routes_sorted
 
-            selected_routes = st.pills(
-                "Route Code 선택",
+            selected_routes = st.multiselect(
+                "2. Route Code (노선 선택)",
                 options=["전체 (통합 보기)"] + available_routes,
-                selection_mode="multi",
-                default=["전체 (통합 보기)"],
-                label_visibility="collapsed"
+                default=[],
+                placeholder="선택 안 함 (전체 통합 보기)"
             )
 
         # 3. Sales Channel
-        selected_channels = ["전체"]
+        selected_channels = []
         if "Sales Channel" in df.columns:
-            st.markdown("**3. Sales Channel (직판/간판)**")
             channels = sorted([str(x) for x in df["Sales Channel"].dropna().unique().tolist()])
-            selected_channels = st.pills(
-                "Sales Channel 선택",
+            selected_channels = st.multiselect(
+                "3. Sales Channel (직판/간판)",
                 options=["전체"] + channels,
-                selection_mode="multi",
-                default=["전체"],
-                label_visibility="collapsed"
+                default=[],
+                placeholder="선택 안 함 (전체)"
             )
 
         # 4. Purchase Week
-        selected_weeks = ["전체"]
+        selected_weeks = []
         if "Purchase Week" in df.columns:
-            st.markdown("**4. Purchase Week (구매 주차)**")
             weeks = sorted([str(x) for x in df["Purchase Week"].dropna().unique().tolist()])
-            selected_weeks = st.pills(
-                "Purchase Week 선택",
+            selected_weeks = st.multiselect(
+                "4. Purchase Week (구매 주차)",
                 options=["전체"] + weeks,
-                selection_mode="multi",
-                default=["전체"],
-                label_visibility="collapsed"
+                default=[],
+                placeholder="선택 안 함 (전체)"
             )
 
         # 5. Bound
-        selected_bounds = ["전체"]
+        selected_bounds = []
         if "Bound" in df.columns:
-            st.markdown("**5. Bound (IN/OUT)**")
             bounds = sorted([str(x) for x in df["Bound"].dropna().unique().tolist()])
-            selected_bounds = st.pills(
-                "Bound 선택",
+            selected_bounds = st.multiselect(
+                "5. Bound (IN/OUT)",
                 options=["전체"] + bounds,
-                selection_mode="multi",
-                default=["전체"],
-                label_visibility="collapsed"
+                default=[],
+                placeholder="선택 안 함 (전체)"
             )
 
         # 6. 출발월
-        selected_months = ["전체"]
+        selected_months = []
         if "출발월" in df.columns:
-            st.markdown("**6. 출발월**")
             months = sorted([str(x) for x in df["출발월"].dropna().unique().tolist() if str(x) != ""])
-            selected_months = st.pills(
-                "출발월 선택",
+            selected_months = st.multiselect(
+                "6. 출발월",
                 options=["전체"] + months,
-                selection_mode="multi",
-                default=["전체"],
-                label_visibility="collapsed"
+                default=[],
+                placeholder="선택 안 함 (전체)"
             )
 
         # 7. Time Slot
-        selected_slots = ["전체"]
+        selected_slots = []
         if "Time Slot" in df.columns:
-            st.markdown("**7. Time Slot (출발 시간대)**")
             slots = sorted([str(x) for x in df["Time Slot"].dropna().unique().tolist()])
-            selected_slots = st.pills(
-                "Time Slot 선택",
+            selected_slots = st.multiselect(
+                "7. Time Slot (출발 시간대)",
                 options=["전체"] + slots,
-                selection_mode="multi",
-                default=["전체"],
-                label_visibility="collapsed"
+                default=[],
+                placeholder="선택 안 함 (전체)"
             )
 
         st.markdown("---")
-        # 🔥 클릭 시에만 필터가 적용되도록 하는 핵심 버튼
         submitted = st.form_submit_button("🚀 필터 적용하기", use_container_width=True)
 
     # ---------------------------------------------------------
-    # 🔍 필터링 조건 실제 적용
+    # 🔒 관리자 전용 영역 (사이드바 하단)
+    # ---------------------------------------------------------
+    st.sidebar.divider()
+    st.sidebar.header("🔒 관리자 전용 영역")
+    admin_pw_input = st.sidebar.text_input("관리자 비밀번호", type="password", placeholder="비밀번호 입력", key="admin_pw")
+
+    # ---------------------------------------------------------
+    # 🔍 필터링 조건 적용
     # ---------------------------------------------------------
     filtered_df = df
 
@@ -326,8 +323,6 @@ if st.session_state["raw_df"] is not None:
 
     if selected_routes and "전체 (통합 보기)" not in selected_routes:
         filtered_df = filtered_df[filtered_df["Route Code"].isin(selected_routes)]
-    else:
-        selected_routes = []
 
     if selected_channels and "전체" not in selected_channels:
         filtered_df = filtered_df[filtered_df["Sales Channel"].isin(selected_channels)]
@@ -345,7 +340,7 @@ if st.session_state["raw_df"] is not None:
         filtered_df = filtered_df[filtered_df["Time Slot"].isin(selected_slots)]
 
     # ---------------------------------------------------------
-    # 📊 메인 화면
+    # 📊 메인 화면 (전체 공개 분석 차트)
     # ---------------------------------------------------------
     st.success(f"✅ 데이터 분석 준비 완료 (적용 건수: {len(filtered_df):,} 건)")
 
@@ -494,41 +489,50 @@ if st.session_state["raw_df"] is not None:
             fig_bound.update_layout(height=400, showlegend=True)
             st.plotly_chart(fig_bound, width="stretch")
 
+    # ---------------------------------------------------------
+    # 🔒 관리자 전용 데이터 미리보기 및 엑셀 다운로드
+    # ---------------------------------------------------------
     st.divider()
 
-    st.subheader("📋 가공 완료 데이터 미리보기 (가중치 및 추정건수 포함)")
-    new_cols = [
-        c
-        for c in [
-            "Route Code",
-            "KE 취항 여부",
-            "Sales Channel",
-            "출발월",
-            "Weight",
-            "Estimated Count",
-            "Purchase Week",
-            "Bound",
-            "Time Slot",
+    if admin_pw_input == ADMIN_PASSWORD:
+        st.success("🔓 관리자 인증이 완료되었습니다. (데이터 미리보기 및 다운로드 활성화)")
+        
+        st.subheader("📋 가공 완료 데이터 미리보기 (가중치 및 추정건수 포함)")
+        new_cols = [
+            c
+            for c in [
+                "Route Code",
+                "KE 취항 여부",
+                "Sales Channel",
+                "출발월",
+                "Weight",
+                "Estimated Count",
+                "Purchase Week",
+                "Bound",
+                "Time Slot",
+            ]
+            if c in filtered_df.columns
         ]
-        if c in filtered_df.columns
-    ]
-    other_cols = [c for c in filtered_df.columns if c not in new_cols]
-    final_df = filtered_df[new_cols + other_cols]
+        other_cols = [c for c in filtered_df.columns if c not in new_cols]
+        final_df = filtered_df[new_cols + other_cols]
 
-    st.dataframe(final_df.head(30), width="stretch")
-    st.caption("※ 대시보드 속도 향상을 위해 미리보기는 상위 30건만 표출되며, 전체 데이터는 아래 엑셀 다운로드 버튼을 이용하세요.")
+        st.dataframe(final_df.head(30), width="stretch")
+        st.caption("※ 대시보드 속도 향상을 위해 미리보기는 상위 30건만 표출되며, 전체 데이터는 아래 엑셀 다운로드 버튼을 이용하세요.")
 
-    st.subheader("📥 필터 및 추정 반영 데이터 엑셀 다운로드")
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        final_df.to_excel(writer, index=False, sheet_name="Processed_Ticketing")
-    processed_data = output.getvalue()
+        st.subheader("📥 필터 및 추정 반영 데이터 엑셀 다운로드")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            final_df.to_excel(writer, index=False, sheet_name="Processed_Ticketing")
+        processed_data = output.getvalue()
 
-    st.download_button(
-        label="🚀 가공 및 필터 완료 엑셀 파일 다운로드",
-        data=processed_data,
-        file_name="processed_ticketing_data.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+        st.download_button(
+            label="🚀 가공 및 필터 완료 엑셀 파일 다운로드",
+            data=processed_data,
+            file_name="processed_ticketing_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    else:
+        st.info("🔒 '가공 데이터 미리보기' 및 '엑셀 다운로드'는 관리자 전용 기능입니다. 좌측 사이드바 하단에서 관리자 비밀번호를 입력해주세요.")
+
 else:
     st.info("👋 분석을 시작하려면 상단의 '1. RAW DATA 파일'을 업로드해 주세요.")
