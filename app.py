@@ -320,13 +320,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 사이드바 필터 폼
         st.sidebar.markdown("---")
         st.sidebar.header("🔍 발매 대시보드 필터")
         with st.sidebar.form("iss_filter_form"):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             
-            # 토글 스위치 상태에 맞춰 노선 내림차순 목록 동적 정렬
+            # 스위치 상태에 직관적으로 맞춘 노선 정렬 지표 결정
             target_metric = 'Weighted_Value' if apply_weight_toggle else 'Value'
             full_route_sum = merged_df.groupby('노선', observed=False)[target_metric].sum().sort_values(ascending=False)
             route_order_list = [str(x) for x in full_route_sum.index.tolist()]
@@ -378,7 +377,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             top_al = str(al_sum.idxmax())
             top_ms = (al_sum.max() / total_pax) * 100
 
-        # 선택된 필터 결과 내 동일 기준 1위 노선
+        # 선택된 필터 결과 내 동일 지표 기준 1위 노선 추출
         if not filtered_df.empty and total_pax > 0:
             filtered_route_sum = filtered_df.groupby('노선', observed=False)[val_col].sum()
             top_route = str(filtered_route_sum.idxmax())
