@@ -204,123 +204,145 @@ if st.session_state["raw_df"] is not None:
 
         df["Estimated Count"] = pd.to_numeric(df["Weight"], errors="coerce").fillna(1.0)
 
-        # 메모리 슬림화: 카테고리형 변환
+        # 메모리 슬림화
         cat_cols = ["KE 취항 여부", "Route Code", "Sales Channel", "Purchase Week", "Bound", "출발월", "Time Slot", airline_col]
         for col in cat_cols:
             if col in df.columns:
                 df[col] = df[col].astype("category")
 
     # ---------------------------------------------------------
-    # 🎛️ 사이드바 필터 (Pills / 나열형 버튼 표출 방식)
+    # 🎛️ 사이드바 필터 (st.form으로 배치하여 버튼 누를 때만 연산)
     # ---------------------------------------------------------
-    st.sidebar.header("🎛️ 대시보드 필터")
+    st.sidebar.header("🎛️ 대시보드 필터 설정")
 
+    with st.sidebar.form("filter_form"):
+        # 1. KE 취항 여부
+        ke_opt = "KE 취항 노선만"
+        if "KE 취항 여부" in df.columns:
+            st.markdown("**1. KE 취항 여부**")
+            ke_opt = st.pills(
+                "KE 취항 여부 선택",
+                ["전체", "KE 취항 노선만", "KE 미취항 노선만"],
+                default="KE 취항 노선만",
+                label_visibility="collapsed"
+            )
+
+        # 2. Route Code
+        selected_routes = []
+        if "Route Code" in df.columns:
+            st.markdown("**2. Route Code (노선 선택)**")
+            route_counts = df["Route Code"].value_counts()
+            ke_routes_sorted = [str(r) for r in route_counts.index if str(r) in KE_ROUTES]
+            non_ke_routes_sorted = [str(r) for r in route_counts.index if str(r) not in KE_ROUTES]
+            available_routes = ke_routes_sorted + non_ke_routes_sorted
+
+            selected_routes = st.pills(
+                "Route Code 선택",
+                options=["전체 (통합 보기)"] + available_routes,
+                selection_mode="multi",
+                default=["전체 (통합 보기)"],
+                label_visibility="collapsed"
+            )
+
+        # 3. Sales Channel
+        selected_channels = ["전체"]
+        if "Sales Channel" in df.columns:
+            st.markdown("**3. Sales Channel (직판/간판)**")
+            channels = sorted([str(x) for x in df["Sales Channel"].dropna().unique().tolist()])
+            selected_channels = st.pills(
+                "Sales Channel 선택",
+                options=["전체"] + channels,
+                selection_mode="multi",
+                default=["전체"],
+                label_visibility="collapsed"
+            )
+
+        # 4. Purchase Week
+        selected_weeks = ["전체"]
+        if "Purchase Week" in df.columns:
+            st.markdown("**4. Purchase Week (구매 주차)**")
+            weeks = sorted([str(x) for x in df["Purchase Week"].dropna().unique().tolist()])
+            selected_weeks = st.pills(
+                "Purchase Week 선택",
+                options=["전체"] + weeks,
+                selection_mode="multi",
+                default=["전체"],
+                label_visibility="collapsed"
+            )
+
+        # 5. Bound
+        selected_bounds = ["전체"]
+        if "Bound" in df.columns:
+            st.markdown("**5. Bound (IN/OUT)**")
+            bounds = sorted([str(x) for x in df["Bound"].dropna().unique().tolist()])
+            selected_bounds = st.pills(
+                "Bound 선택",
+                options=["전체"] + bounds,
+                selection_mode="multi",
+                default=["전체"],
+                label_visibility="collapsed"
+            )
+
+        # 6. 출발월
+        selected_months = ["전체"]
+        if "출발월" in df.columns:
+            st.markdown("**6. 출발월**")
+            months = sorted([str(x) for x in df["출발월"].dropna().unique().tolist() if str(x) != ""])
+            selected_months = st.pills(
+                "출발월 선택",
+                options=["전체"] + months,
+                selection_mode="multi",
+                default=["전체"],
+                label_visibility="collapsed"
+            )
+
+        # 7. Time Slot
+        selected_slots = ["전체"]
+        if "Time Slot" in df.columns:
+            st.markdown("**7. Time Slot (출발 시간대)**")
+            slots = sorted([str(x) for x in df["Time Slot"].dropna().unique().tolist()])
+            selected_slots = st.pills(
+                "Time Slot 선택",
+                options=["전체"] + slots,
+                selection_mode="multi",
+                default=["전체"],
+                label_visibility="collapsed"
+            )
+
+        st.markdown("---")
+        # 🔥 클릭 시에만 필터가 적용되도록 하는 핵심 버튼
+        submitted = st.form_submit_button("🚀 필터 적용하기", use_container_width=True)
+
+    # ---------------------------------------------------------
+    # 🔍 필터링 조건 실제 적용
+    # ---------------------------------------------------------
     filtered_df = df
 
-    # 1. KE 취항 여부
     if "KE 취항 여부" in df.columns:
-        st.sidebar.markdown("**1. KE 취항 여부**")
-        ke_opt = st.sidebar.pills(
-            "KE 취항 여부 선택",
-            ["전체", "KE 취항 노선만", "KE 미취항 노선만"],
-            default="KE 취항 노선만",
-            label_visibility="collapsed"
-        )
         if ke_opt == "KE 취항 노선만":
             filtered_df = filtered_df[filtered_df["KE 취항 여부"] == "KE 취항"]
         elif ke_opt == "KE 미취항 노선만":
             filtered_df = filtered_df[filtered_df["KE 취항 여부"] == "KE 미취항"]
 
-    # 2. Route Code
-    selected_routes = []
-    if "Route Code" in filtered_df.columns:
-        st.sidebar.markdown("**2. Route Code (노선 선택)**")
-        route_counts = filtered_df["Route Code"].value_counts()
-        ke_routes_sorted = [str(r) for r in route_counts.index if str(r) in KE_ROUTES]
-        non_ke_routes_sorted = [str(r) for r in route_counts.index if str(r) not in KE_ROUTES]
-        available_routes = ke_routes_sorted + non_ke_routes_sorted
+    if selected_routes and "전체 (통합 보기)" not in selected_routes:
+        filtered_df = filtered_df[filtered_df["Route Code"].isin(selected_routes)]
+    else:
+        selected_routes = []
 
-        selected_routes = st.sidebar.pills(
-            "Route Code 선택",
-            options=["전체 (통합 보기)"] + available_routes,
-            selection_mode="multi",
-            default=["전체 (통합 보기)"],
-            label_visibility="collapsed"
-        )
-        if selected_routes and "전체 (통합 보기)" not in selected_routes:
-            filtered_df = filtered_df[filtered_df["Route Code"].isin(selected_routes)]
-        else:
-            selected_routes = []
+    if selected_channels and "전체" not in selected_channels:
+        filtered_df = filtered_df[filtered_df["Sales Channel"].isin(selected_channels)]
 
-    # 3. Sales Channel
-    if "Sales Channel" in filtered_df.columns:
-        st.sidebar.markdown("**3. Sales Channel (직판/간판)**")
-        channels = sorted([str(x) for x in filtered_df["Sales Channel"].dropna().unique().tolist()])
-        selected_channels = st.sidebar.pills(
-            "Sales Channel 선택",
-            options=["전체"] + channels,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
-        )
-        if selected_channels and "전체" not in selected_channels:
-            filtered_df = filtered_df[filtered_df["Sales Channel"].isin(selected_channels)]
+    if selected_weeks and "전체" not in selected_weeks:
+        filtered_df = filtered_df[filtered_df["Purchase Week"].isin(selected_weeks)]
 
-    # 4. Purchase Week
-    if "Purchase Week" in filtered_df.columns:
-        st.sidebar.markdown("**4. Purchase Week (구매 주차)**")
-        weeks = sorted([str(x) for x in filtered_df["Purchase Week"].dropna().unique().tolist()])
-        selected_weeks = st.sidebar.pills(
-            "Purchase Week 선택",
-            options=["전체"] + weeks,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
-        )
-        if selected_weeks and "전체" not in selected_weeks:
-            filtered_df = filtered_df[filtered_df["Purchase Week"].isin(selected_weeks)]
+    if selected_bounds and "전체" not in selected_bounds:
+        filtered_df = filtered_df[filtered_df["Bound"].isin(selected_bounds)]
 
-    # 5. Bound
-    if "Bound" in filtered_df.columns:
-        st.sidebar.markdown("**5. Bound (IN/OUT)**")
-        bounds = sorted([str(x) for x in filtered_df["Bound"].dropna().unique().tolist()])
-        selected_bounds = st.sidebar.pills(
-            "Bound 선택",
-            options=["전체"] + bounds,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
-        )
-        if selected_bounds and "전체" not in selected_bounds:
-            filtered_df = filtered_df[filtered_df["Bound"].isin(selected_bounds)]
+    if selected_months and "전체" not in selected_months:
+        filtered_df = filtered_df[filtered_df["출발월"].isin(selected_months)]
 
-    # 6. 출발월
-    if "출발월" in filtered_df.columns:
-        st.sidebar.markdown("**6. 출발월**")
-        months = sorted([str(x) for x in filtered_df["출발월"].dropna().unique().tolist() if str(x) != ""])
-        selected_months = st.sidebar.pills(
-            "출발월 선택",
-            options=["전체"] + months,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
-        )
-        if selected_months and "전체" not in selected_months:
-            filtered_df = filtered_df[filtered_df["출발월"].isin(selected_months)]
-
-    # 7. Time Slot
-    if "Time Slot" in filtered_df.columns:
-        st.sidebar.markdown("**7. Time Slot (출발 시간대)**")
-        slots = sorted([str(x) for x in filtered_df["Time Slot"].dropna().unique().tolist()])
-        selected_slots = st.sidebar.pills(
-            "Time Slot 선택",
-            options=["전체"] + slots,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
-        )
-        if selected_slots and "전체" not in selected_slots:
-            filtered_df = filtered_df[filtered_df["Time Slot"].isin(selected_slots)]
+    if selected_slots and "전체" not in selected_slots:
+        filtered_df = filtered_df[filtered_df["Time Slot"].isin(selected_slots)]
 
     # ---------------------------------------------------------
     # 📊 메인 화면
