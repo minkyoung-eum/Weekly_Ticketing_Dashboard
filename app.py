@@ -6,7 +6,7 @@ import numpy as np
 import datetime
 import os
 
-# 1. Streamlit 테마 설정 자동 생성 (.streamlit/config.toml) - 붉은색 테마 완전 제거
+# 1. Streamlit 테마 설정 자동 생성 (.streamlit/config.toml) - Primary Color 커스텀
 os.makedirs(".streamlit", exist_ok=True)
 config_path = os.path.join(".streamlit", "config.toml")
 with open(config_path, "w", encoding="utf-8") as f:
@@ -300,7 +300,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             selected_channels = get_form_selection("판매채널", all_channels)
             selected_airlines = get_form_selection("항공사 (KE 최우선)", all_airlines)
 
-            st.form_submit_button("🚀 발매 필터 적용하기", use_container_width=True)
+            st.form_submit_button("🚀 발매 필터 적용하기")
 
         val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
@@ -358,7 +358,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         color='Dominant Marketing Airline', color_discrete_map=color_discrete_map
                     )
                     fig1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
-                    st.plotly_chart(fig1, use_container_width=True)
+                    st.plotly_chart(fig1, width="stretch")
 
                 with c2:
                     bar_iss_grp = filtered_df.groupby(['노선', 'Dominant Marketing Airline'])[val_col].sum().reset_index()
@@ -377,19 +377,19 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         hovertemplate="<b>노선: %{x}</b><br>항공사: %{fullData.name}<br>발매 점유율: %{y:.1f}%<extra></extra>"
                     )
                     fig2.update_layout(yaxis_title="발매 M/S 점유비 (%)", yaxis_ticksuffix="%")
-                    st.plotly_chart(fig2, use_container_width=True)
+                    st.plotly_chart(fig2, width="stretch")
 
                 st.markdown("---")
                 c3, c4, c5 = st.columns(3)
                 with c3:
                     fig3 = px.pie(filtered_df.groupby('Bound')[val_col].sum().reset_index(), values=val_col, names='Bound', title='3. BOUND별 점유비', hole=0.4)
-                    st.plotly_chart(fig3, use_container_width=True)
+                    st.plotly_chart(fig3, width="stretch")
                 with c4:
                     fig4 = px.pie(filtered_df.groupby('Ticket Type')[val_col].sum().reset_index(), values=val_col, names='Ticket Type', title='4. TRIP TYPE별 점유비', hole=0.4)
-                    st.plotly_chart(fig4, use_container_width=True)
+                    st.plotly_chart(fig4, width="stretch")
                 with c5:
                     fig5 = px.pie(filtered_df.groupby('판매채널')[val_col].sum().reset_index(), values=val_col, names='판매채널', title='5. 판매 채널별 점유비', hole=0.4)
-                    st.plotly_chart(fig5, use_container_width=True)
+                    st.plotly_chart(fig5, width="stretch")
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
@@ -398,15 +398,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 piv_w = filtered_df.pivot_table(index='Dominant Marketing Airline', columns='발매주차', values=val_col, aggfunc='sum', fill_value=0)
                 piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
                 al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
-                st.dataframe(piv_w_ms.loc[al_sorted].applymap(lambda x: f"{x:.1f}%"), use_container_width=True)
+                st.dataframe(piv_w_ms.loc[al_sorted].map(lambda x: f"{x:.1f}%"), width="stretch")
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선', columns='Dominant Marketing Airline', values=val_col, aggfunc='sum', fill_value=0)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
                 piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
-                st.dataframe(piv_r_ms.applymap(lambda x: f"{x:.1f}%"), use_container_width=True)
+                st.dataframe(piv_r_ms.map(lambda x: f"{x:.1f}%"), width="stretch")
 
         with tab3:
-            st.dataframe(filtered_df, use_container_width=True)
+            st.dataframe(filtered_df, width="stretch")
 
     else:
         if df_sup_raw is None:
@@ -433,7 +433,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         else:
             df_sup['Flights_num'] = 1
 
-        sup_routes = df_sup.groupby('노선')['Seats_num'].sort_values(ascending=False).index.tolist()
+        sup_routes = df_sup.groupby('노선')['Seats_num'].sum().sort_values(ascending=False).index.tolist()
         sup_months = sorted([str(x) for x in df_sup['출발 월'].dropna().unique()]) if '출발 월' in df_sup.columns else []
         sup_time_cats = sorted([str(x) for x in df_sup['출발 시간대'].dropna().unique()]) if '출발 시간대' in df_sup.columns else []
         
@@ -461,7 +461,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             selected_sup_times = get_sup_selection("출발 시간대", sup_time_cats)
             selected_sup_airlines = get_sup_selection("항공사 (KE 최우선)", sup_airlines)
 
-            st.form_submit_button("🚀 공급 필터 적용하기", use_container_width=True)
+            st.form_submit_button("🚀 공급 필터 적용하기")
 
         target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
 
@@ -516,7 +516,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         color='Airline', color_discrete_map=color_discrete_map
                     )
                     fig_s1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
-                    st.plotly_chart(fig_s1, use_container_width=True)
+                    st.plotly_chart(fig_s1, width="stretch")
 
                 with cs2:
                     bar_sup_grp = filtered_sup.groupby(['노선', 'Airline'])[target_val].sum().reset_index()
@@ -535,7 +535,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         hovertemplate="<b>노선: %{x}</b><br>항공사: %{fullData.name}<br>점유율: %{y:.1f}%<extra></extra>"
                     )
                     fig_s2.update_layout(yaxis_title="M/S 점유비 (%)", yaxis_ticksuffix="%")
-                    st.plotly_chart(fig_s2, use_container_width=True)
+                    st.plotly_chart(fig_s2, width="stretch")
 
                 st.markdown("---")
                 cs3, cs4 = st.columns(2)
@@ -543,7 +543,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     if '출발 시간대' in filtered_sup.columns:
                         fig_s3 = px.pie(filtered_sup.groupby('출발 시간대')[target_val].sum().reset_index(), values=target_val, names='출발 시간대', title='3. 출발 시간대별 공급 비중', hole=0.4)
                         fig_s3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>시간대: %{label}</b><br>공급량: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>")
-                        st.plotly_chart(fig_s3, use_container_width=True)
+                        st.plotly_chart(fig_s3, width="stretch")
                 
                 with cs4:
                     if '출발 월' in filtered_sup.columns:
@@ -559,7 +559,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             hovertemplate="<b>출발월: %{x}</b><br>공급량: %{y:,.0f}<extra></extra>"
                         )
                         fig_s4.update_layout(yaxis_title=f"공급 ({'좌석수' if '공급석' in metric_mode else '편수'})")
-                        st.plotly_chart(fig_s4, use_container_width=True)
+                        st.plotly_chart(fig_s4, width="stretch")
 
                 st.markdown("---")
                 st.subheader("✈️ 노선 선택 및 항공사별 운항 스케줄 타임라인 차트")
@@ -587,7 +587,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
                         fig_timeline.update_traces(textposition='inside', hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{x}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>", customdata=df_schedule[['Seats_num']])
                         fig_timeline.update_layout(height=400, showlegend=True)
-                        st.plotly_chart(fig_timeline, use_container_width=True)
+                        st.plotly_chart(fig_timeline, width="stretch")
 
         with tab_s2:
             st.markdown(f"##### 📌 노선 및 출발월별 공급 M/S 매트릭스 ({metric_mode})")
@@ -597,16 +597,16 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 cols_sup_ke = ['KE'] + [x for x in piv_s_route.columns if x != 'KE'] if 'KE' in piv_s_route.columns else piv_s_route.columns
                 piv_s_route = piv_s_route[cols_sup_ke]
                 piv_s_route_ms = piv_s_route.divide(piv_s_route.sum(axis=1), axis=0) * 100
-                st.dataframe(piv_s_route_ms.applymap(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), use_container_width=True)
+                st.dataframe(piv_s_route_ms.map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
             with ts2:
                 if '출발 월' in filtered_sup.columns:
                     piv_s_month = filtered_sup.pivot_table(index='Airline', columns='출발 월', values=target_val, aggfunc='sum', fill_value=0)
                     piv_s_month_ms = piv_s_month.divide(piv_s_month.sum(axis=0), axis=1) * 100
                     al_sup_ke = ['KE'] + [x for x in piv_s_month_ms.index if x != 'KE'] if 'KE' in piv_s_month_ms.index else piv_s_month_ms.index
-                    st.dataframe(piv_s_month_ms.loc[al_sup_ke].applymap(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), use_container_width=True)
+                    st.dataframe(piv_s_month_ms.loc[al_sup_ke].map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
 
         with tab_s3:
-            st.dataframe(filtered_sup, use_container_width=True)
+            st.dataframe(filtered_sup, width="stretch")
 
 # ==========================================
 # GROUP 2: 🌐 6수송 대시보드 (6TRF TEST.csv)
@@ -619,7 +619,6 @@ else:
 
     df_6 = df_6th_raw.copy()
     
-    # Column Mapping for 6th Freedom
     col_map_6th = {
         'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 '],
         'OD REGION': ['OD REGION', 'Region', 'OD 권역'],
@@ -643,7 +642,6 @@ else:
     for key, p_list in col_map_6th.items():
         actual_cols[key] = get_actual_col(df_6, p_list)
 
-    # Sidebar Form for Requested Filter Order & Types
     st.sidebar.markdown("---")
     st.sidebar.header("🔍 6수송 대시보드 필터")
     
@@ -666,9 +664,6 @@ else:
                 return unique_vals if selected == ALL_OPTION else [selected]
             return []
 
-        # Exact Requested Filter Order:
-        # 1. TRIP MONTH, 2. OD REGION, 3. DIRECTION, 4. STOP OVER, 5. OD ON/OFF (Multiselect - All Visible)
-        # 6. TRIP ORIGIN COUNTRY, 7. 일본 APO (Dropdown), 8. TRIP DSTN COUNTRY, 9. 해외 APO, 10. 항공사 (Dropdown)
         f_month = create_6th_multiselect("1. TRIP MONTH (출발월)", 'TRIP MONTH')
         f_region = create_6th_multiselect("2. OD REGION", 'OD REGION')
         f_dir = create_6th_multiselect("3. DIRECTION", 'DIRECTION')
@@ -680,9 +675,8 @@ else:
         f_ov_apo = create_6th_multiselect("9. 해외 APO", '해외 APO')
         f_al = create_6th_selectbox("10. 항공사 (드롭다운)", '항공사')
 
-        st.form_submit_button("🚀 6수송 필터 적용하기", use_container_width=True)
+        st.form_submit_button("🚀 6수송 필터 적용하기")
 
-    # Filtering Logic
     mask_6 = pd.Series(True, index=df_6.index)
     field_filters = [
         ('TRIP MONTH', f_month), ('OD REGION', f_region), ('DIRECTION', f_dir),
@@ -698,7 +692,6 @@ else:
 
     filtered_6 = df_6[mask_6]
 
-    # Numeric Target Volume Column
     val_col_6 = 'Value' if 'Value' in filtered_6.columns else ('Seats' if 'Seats' in filtered_6.columns else 'Flights')
     if val_col_6 in filtered_6.columns:
         filtered_6['Val_num'] = pd.to_numeric(filtered_6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1)
@@ -708,7 +701,6 @@ else:
     al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Airline'
     od_col_6 = actual_cols['OD ON/OFF'] if actual_cols['OD ON/OFF'] else '노선'
 
-    # Check for Previous Year (PY) or YoY columns in dataset
     py_col_6 = 'Value_PY' if 'Value_PY' in filtered_6.columns else ('PY_Value' if 'PY_Value' in filtered_6.columns else None)
     if py_col_6:
         filtered_6['Val_PY_num'] = pd.to_numeric(filtered_6[py_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
@@ -716,7 +708,6 @@ else:
         np.random.seed(42)
         filtered_6['Val_PY_num'] = (filtered_6['Val_num'] * np.random.uniform(0.85, 1.15, len(filtered_6))).round()
 
-    # Top KPI Metrics
     c6_1, c6_2, c6_3 = st.columns(3)
     tot_6_val = filtered_6['Val_num'].sum()
     tot_6_py = filtered_6['Val_PY_num'].sum()
@@ -744,9 +735,6 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # ------------------------------------------
-    # TAB 1: 📊 O&D별 종합 M/S 분석
-    # ------------------------------------------
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (YoY 전년비 포함)")
         
@@ -836,11 +824,8 @@ else:
                 color_discrete_map={'금년 (CY)': '#0ea5e9', '전년 (PY)': '#cbd5e1'}
             )
             fig_6_yoy.update_traces(texttemplate='%{y:,.0f}', textposition='outside')
-            st.plotly_chart(fig_6_yoy, use_container_width=True)
+            st.plotly_chart(fig_6_yoy, width="stretch")
 
-    # ------------------------------------------
-    # TAB 2: 📌 Carrier별 M/S (TOP O&D 상세 테이블)
-    # ------------------------------------------
     with tab6_2:
         st.subheader("■ Carrier별 M/S (TOP O&D 상세 비교)")
         if not filtered_6.empty and od_col_6 in filtered_6.columns and al_col_6 in filtered_6.columns:
@@ -950,4 +935,4 @@ else:
             st.markdown(carrier_html, unsafe_allow_html=True)
 
     with tab6_3:
-        st.dataframe(filtered_6, use_container_width=True)
+        st.dataframe(filtered_6, width="stretch")
