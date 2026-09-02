@@ -118,29 +118,28 @@ val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 # 노선 발매량 순 정렬 목록 산출
 route_order_list = merged_df.groupby('노선')[val_col].sum().sort_values(ascending=False).index.tolist()
 
-# 1. 노선 (발매량 순 정렬)
+# 1. 노선 (Default: 전체 선택)
 selected_routes = st.sidebar.multiselect("노선 (발매량 순)", options=route_order_list, default=route_order_list)
 
-# 2. 출발 월
+# 2. 출발 월 (Default: 전체 선택)
 all_dep_months = sorted([str(x) for x in merged_df['출발 월'].dropna().unique()])
 selected_dep_months = st.sidebar.multiselect("출발 월", options=all_dep_months, default=all_dep_months)
 
-# 3. Bound
+# 3. Bound (Default: 전체 선택)
 all_bounds = sorted([str(x) for x in merged_df['Bound'].dropna().unique()])
 selected_bounds = st.sidebar.multiselect("Bound", options=all_bounds, default=all_bounds)
 
-# 4. Ticket Type (여정)
+# 4. Ticket Type (Default: 전체 선택)
 all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
 selected_ticket_types = st.sidebar.multiselect("Ticket Type (여정)", options=all_ticket_types, default=all_ticket_types)
 
-# 5. 판매채널
+# 5. 판매채널 (Default: 전체 선택)
 all_channels = sorted([str(x) for x in merged_df['판매채널'].dropna().unique()])
 selected_channels = st.sidebar.multiselect("판매채널", options=all_channels, default=all_channels)
 
-# 6. 항공사
+# 6. 항공사 (Default: 전체 선택)
 all_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
-top_defaults = [al for al in ['KE', 'OZ', '7C', 'LJ', 'TW', 'BX', 'RS', 'ZE'] if al in all_airlines]
-selected_airlines = st.sidebar.multiselect("항공사", options=all_airlines, default=top_defaults if top_defaults else all_airlines)
+selected_airlines = st.sidebar.multiselect("항공사", options=all_airlines, default=all_airlines)
 
 # Filter Dataset
 filtered_df = merged_df[
@@ -203,6 +202,11 @@ with tab1:
                 hole=0.4,
                 color_discrete_sequence=px.colors.qualitative.Set2
             )
+            fig_pie_al.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>"
+            )
             st.plotly_chart(fig_pie_al, use_container_width=True)
             
         with col_r1_2:
@@ -216,6 +220,10 @@ with tab1:
                 barmode='stack',
                 color_discrete_sequence=px.colors.qualitative.Set2
             )
+            fig_week.update_traces(
+                hovertemplate="<b>주차: %{x}</b><br>항공사: %{fullData.name}<br>실적: %{y:,.0f}<extra></extra>"
+            )
+            fig_week.update_layout(xaxis_title="발매주차", yaxis_title="실적 (Pax)")
             st.plotly_chart(fig_week, use_container_width=True)
 
         st.markdown("---")
@@ -233,6 +241,11 @@ with tab1:
                 hole=0.4,
                 color_discrete_sequence=px.colors.qualitative.Pastel
             )
+            fig_bound.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                hovertemplate="<b>Bound: %{label}</b><br>실적: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>"
+            )
             st.plotly_chart(fig_bound, use_container_width=True)
 
         with col_r2_2:
@@ -245,6 +258,11 @@ with tab1:
                 hole=0.4,
                 color_discrete_sequence=px.colors.qualitative.Set3
             )
+            fig_tt.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                hovertemplate="<b>Ticket Type: %{label}</b><br>실적: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>"
+            )
             st.plotly_chart(fig_tt, use_container_width=True)
 
         with col_r2_3:
@@ -256,6 +274,11 @@ with tab1:
                 title='5. 판매 채널별 점유비', 
                 hole=0.4,
                 color_discrete_sequence=px.colors.qualitative.Safe
+            )
+            fig_channel.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                hovertemplate="<b>판매채널: %{label}</b><br>실적: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>"
             )
             st.plotly_chart(fig_channel, use_container_width=True)
 
@@ -303,7 +326,6 @@ with tab2:
                 fill_value=0
             )
             
-            # 노선을 총 발매량 내림차순으로 정렬
             route_pax_sums = filtered_df.groupby('노선')[val_col].sum().sort_values(ascending=False)
             sorted_routes = [r for r in route_pax_sums.index if r in piv_route.index]
             piv_route = piv_route.loc[sorted_routes]
@@ -331,4 +353,3 @@ with tab3:
     st.subheader("📋 Data Raw & Weight Match View")
     st.markdown("##### 가중치(Weight_num) 매칭 및 최종 Weighted_Value 적용 데이터")
     st.dataframe(filtered_df[['노선', 'Dominant Marketing Airline', '발매주차', '출발 월', 'Bound', 'Ticket Type', '판매채널', 'Value', 'Weight_num', 'Weighted_Value']], use_container_width=True)
-    st.dataframe(filtered_df[['노선', 'Dominant Marketing Airline', '발매주차', '출발 월', 'Bound', '판매채널', 'Value', 'Weight_num', 'Weighted_Value']], use_container_width=True)
