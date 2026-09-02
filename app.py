@@ -24,7 +24,7 @@ def get_iso_month_week(date):
         dt = pd.to_datetime(date)
         iso_year, iso_week, iso_day = dt.isocalendar()
         days_diff = int(4 - iso_day)
-        thursday = dt + pd.Timedelta(days=days_diff)
+        thursday = dt + pd.DateOffset(days=days_diff)
         month = thursday.month
         week_of_month = (thursday.day - 1) // 7 + 1
         return f"{month}월 {week_of_month}주차"
@@ -341,7 +341,6 @@ if st.session_state["raw_df"] is not None:
     # 🎯 항공사별 발매 점유비 분석 (가중치 적용 추정치 기준)
     # ---------------------------------------------------------
     st.subheader("🎯 항공사별 발매 점유비 (가중치 추정 반영)")
-    st.caption("📌 출처 : DDS, 발매기간 : 최근 5주, 출발기간 : 향후 6개월")
 
     if airline_col not in df.columns:
         st.error(f"⚠️ 파일에 `{airline_col}` 컬럼이 존재하지 않습니다. 컬럼명을 확인해주세요.")
