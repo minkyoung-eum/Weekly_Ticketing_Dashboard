@@ -30,7 +30,7 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# Styling with KE Highlight (#002060)
+# Styling with KE Bright Skyblue Highlight (#00A1E9)
 st.markdown("""
 <style>
     .source-header-box {
@@ -52,12 +52,12 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     .metric-card-ke {
-        background-color: #f0f3ff;
-        border: 2px solid #002060;
+        background-color: #e0f2fe;
+        border: 2px solid #00a1e9;
         border-radius: 10px;
         padding: 16px;
         text-align: center;
-        box-shadow: 0 3px 6px rgba(0,32,96,0.15);
+        box-shadow: 0 3px 6px rgba(0,161,233,0.25);
     }
     .metric-title {
         font-size: 14px;
@@ -153,31 +153,15 @@ merged_df['Weight_num'] = merged_df['Weight_num'].fillna(1.0)
 merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
 merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
 
-# Sidebar Filters
-st.sidebar.header("🔍 대시보드 필터 (Slicers)")
-
-apply_weight_toggle = st.sidebar.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
-val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
-
+# Filter Lists Preparation
 ALL_OPTION = "전체 (All)"
 
-def get_filter_selection(label, full_list, default_to_all=True):
-    options = [ALL_OPTION] + full_list
-    default = [ALL_OPTION] if default_to_all else options
-    selected = st.sidebar.multiselect(label, options=options, default=default)
-    
-    if ALL_OPTION in selected or not selected:
-        return full_list
-    return selected
-
-# 노선 발매량 순 정렬 목록
-route_order_list = merged_df.groupby('노선')[val_col].sum().sort_values(ascending=False).index.tolist()
+route_order_list = merged_df.groupby('노선')['Weighted_Value'].sum().sort_values(ascending=False).index.tolist()
 all_dep_months = sorted([str(x) for x in merged_df['출발 월'].dropna().unique()])
 all_bounds = sorted([str(x) for x in merged_df['Bound'].dropna().unique()])
 all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
 all_channels = sorted([str(x) for x in merged_df['판매채널'].dropna().unique()])
 
-# 항공사 목록 정렬 (KE를 맨 앞으로!)
 raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
 if 'KE' in raw_airlines:
     raw_airlines.remove('KE')
@@ -185,18 +169,30 @@ if 'KE' in raw_airlines:
 else:
     all_airlines = raw_airlines
 
-# 1. 노선
-selected_routes = get_filter_selection("노선 (발매량 순)", route_order_list)
-# 2. 출발 월
-selected_dep_months = get_filter_selection("출발 월", all_dep_months)
-# 3. Bound
-selected_bounds = get_filter_selection("Bound", all_bounds)
-# 4. Ticket Type (여정)
-selected_ticket_types = get_filter_selection("Ticket Type (여정)", all_ticket_types)
-# 5. 판매채널
-selected_channels = get_filter_selection("판매채널", all_channels)
-# 6. 항공사 (KE 맨 앞)
-selected_airlines = get_filter_selection("항공사 (KE 최우선)", all_airlines)
+# Sidebar Filter Form with [Apply Button]
+st.sidebar.header("🔍 대시보드 필터 (Slicers)")
+
+with st.sidebar.form("filter_form"):
+    apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
+    
+    def get_form_selection(label, full_list):
+        options = [ALL_OPTION] + full_list
+        selected = st.multiselect(label, options=options, default=[ALL_OPTION])
+        if ALL_OPTION in selected or not selected:
+            return full_list
+        return selected
+
+    selected_routes = get_form_selection("노선 (발매량 순)", route_order_list)
+    selected_dep_months = get_form_selection("출발 월", all_dep_months)
+    selected_bounds = get_form_selection("Bound", all_bounds)
+    selected_ticket_types = get_form_selection("Ticket Type (여정)", all_ticket_types)
+    selected_channels = get_form_selection("판매채널", all_channels)
+    selected_airlines = get_form_selection("항공사 (KE 최우선)", all_airlines)
+
+    # Submit Button
+    submitted = st.form_submit_button("🚀 필터 적용하기", type="primary", use_container_width=True)
+
+val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
 # Filter Dataset
 filtered_df = merged_df[
@@ -208,8 +204,8 @@ filtered_df = merged_df[
     (merged_df['Dominant Marketing Airline'].astype(str).isin(selected_airlines))
 ]
 
-# Ensure KE is always prioritized in color map
-color_discrete_map = {'KE': '#002060'} # KE Signature Dark Blue
+# Ensure KE is Highlighted with Bright Sky Blue (#00A1E9)
+color_discrete_map = {'KE': '#00A1E9'} 
 
 # KPI Top Summary
 col_m1, col_m2, col_m3, col_m4 = st.columns(4)
@@ -237,7 +233,7 @@ status_wt_label = " (가중치 적용)" if apply_weight_toggle else " (순수 Ra
 with col_m1:
     st.markdown(f'<div class="metric-card"><div class="metric-title">총 발매 실적{status_wt_label}</div><div class="metric-value">{total_pax:,.0f}</div></div>', unsafe_allow_html=True)
 with col_m2:
-    st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#002060; font-weight:bold;">💙 KE (대한항공) M/S</div><div class="metric-value" style="color:#002060;">{ke_pax:,.0f} ({ke_ms:.1f}%)</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#0284c7; font-weight:bold;">✈️ KE (대한항공) M/S</div><div class="metric-value" style="color:#0284c7;">{ke_pax:,.0f} ({ke_ms:.1f}%)</div></div>', unsafe_allow_html=True)
 with col_m3:
     st.markdown(f'<div class="metric-card"><div class="metric-title">1위 항공사 (M/S)</div><div class="metric-value" style="color:#1d4ed8;"><b>{top_al}</b> ({top_ms:.1f}%)</div></div>', unsafe_allow_html=True)
 with col_m4:
@@ -252,7 +248,6 @@ with tab1:
     st.subheader(f"📊 M/S 분석 시각화 대시보드{status_wt_label}")
     
     if not filtered_df.empty:
-        # Sort airlines so KE is first in charts
         al_order = [al for al in all_airlines if al in filtered_df['Dominant Marketing Airline'].unique()]
         
         col_r1_1, col_r1_2 = st.columns(2)
@@ -263,7 +258,7 @@ with tab1:
                 pie_al, 
                 values=val_col, 
                 names='Dominant Marketing Airline', 
-                title='1. 항공사별 M/S 점유비 (KE 강조)', 
+                title='1. 항공사별 M/S 점유비 (KE 하늘색 강조)', 
                 hole=0.4,
                 category_orders={'Dominant Marketing Airline': al_order},
                 color='Dominant Marketing Airline',
@@ -283,11 +278,11 @@ with tab1:
                 x='발매주차',
                 y=val_col,
                 color='Dominant Marketing Airline',
-                title='2. 주차별 항공사 실적 추이 (그래프 내 수치 표시)',
+                title='2. 주차별 항공사 실적 추이 (수치 표시 & KE 강조)',
                 barmode='stack',
                 category_orders={'Dominant Marketing Airline': al_order},
                 color_discrete_map=color_discrete_map,
-                text=val_col # Display value inside/above bar
+                text=val_col
             )
             fig_week.update_traces(
                 texttemplate='%{text:,.0f}',
@@ -379,7 +374,6 @@ with tab2:
             total_by_al = filtered_df.groupby('Dominant Marketing Airline')[val_col].sum()
             piv_week_ms['총합계'] = (total_by_al / total_pax * 100) if total_pax > 0 else 0
             
-            # Sort with KE at the top
             al_sorted_ke = [al for al in ['KE'] + sorted([x for x in piv_week_ms.index if x != 'KE']) if al in piv_week_ms.index]
             piv_week_ms = piv_week_ms.loc[al_sorted_ke]
             
@@ -399,7 +393,6 @@ with tab2:
                 fill_value=0
             )
             
-            # Reorder columns so KE is first
             cols_ke_first = [al for al in ['KE'] + sorted([x for x in piv_route.columns if x != 'KE']) if al in piv_route.columns]
             piv_route = piv_route[cols_ke_first]
             
