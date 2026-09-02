@@ -5,6 +5,19 @@ import plotly.graph_objects as go
 import datetime
 import os
 
+# 1. Streamlit 테마 설정 자동 생성 (.streamlit/config.toml) - 붉은색(Primary Color) 근본적 제거
+os.makedirs(".streamlit", exist_ok=True)
+config_path = os.path.join(".streamlit", "config.toml")
+if not os.path.exists(config_path):
+    with open(config_path, "w", encoding="utf-8") as f:
+        f.write("""[theme]
+primaryColor = "#0ea5e9"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor = "#0f172a"
+font = "sans serif"
+""")
+
 # Page Config
 st.set_page_config(
     page_title="항공사 노선별 통합 M/S 대시보드 (발매 & 공급)",
@@ -29,7 +42,7 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# Custom CSS Styling (붉은색 제거 및 Soft Blue 톤 적용)
+# Custom CSS Styling (Soft Blue & Highlight)
 st.markdown("""
 <style>
     /* 전체 사이드바 배경 및 텍스트 색상 */
@@ -93,11 +106,10 @@ st.markdown("""
         padding: 15px !important;
     }
 
-    /* Multiselect 태그 칩 배경색 (붉은색 테두리/배경 커스텀) */
+    /* Multiselect 태그 칩 Soft Blue 오버라이드 */
     span[data-baseweb="tag"] {
         background-color: #e0f2fe !important;
         border: 1px solid #7dd3fc !important;
-        color: #0369a1 !important;
     }
 
     /* Radio Label & Input 색상 강조 */
@@ -110,11 +122,6 @@ st.markdown("""
     div[data-testid="stRadio"] div[role="radiogroup"] label {
         font-size: 15px !important;
         font-weight: 600 !important;
-    }
-
-    /* Radio 및 Toggle 체크박스 포커스 라인 하늘색 처리 */
-    div[role="radiogroup"] input:checked + div {
-        background-color: #0284c7 !important;
     }
 
     /* Soft Blue Button Style */
@@ -238,7 +245,6 @@ if dashboard_mode == "🎟️ 발매 M/S 대시보드":
     all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
     all_channels = sorted([str(x) for x in merged_df['판매채널'].dropna().unique()])
 
-    # KE 취항노선 여부
     ke_service_col = 'KE취항노선 여부' if 'KE취항노선 여부' in merged_df.columns else ('KE취항여부' if 'KE취항여부' in merged_df.columns else None)
     all_ke_services = sorted([str(x) for x in merged_df[ke_service_col].dropna().unique()]) if ke_service_col else []
 
@@ -282,7 +288,6 @@ if dashboard_mode == "🎟️ 발매 M/S 대시보드":
 
     color_discrete_map = {'KE': '#00A1E9'}
 
-    # KPI Cards
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     total_pax = filtered_df[val_col].sum()
     ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
@@ -407,7 +412,6 @@ else:
     sup_months = sorted([str(x) for x in df_sup['출발 월'].dropna().unique()]) if '출발 월' in df_sup.columns else []
     sup_time_cats = sorted([str(x) for x in df_sup['출발 시간대'].dropna().unique()]) if '출발 시간대' in df_sup.columns else []
     
-    # KE 취항여부 컬럼 처리
     sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
     sup_ke_services = sorted([str(x) for x in df_sup[sup_ke_col].dropna().unique()]) if sup_ke_col else []
 
@@ -449,7 +453,6 @@ else:
 
     color_discrete_map = {'KE': '#00A1E9'}
 
-    # Top KPI Cards
     col_s1, col_s2, col_s3, col_s4 = st.columns(4)
     total_seats = filtered_sup['Seats_num'].sum()
     total_flights = filtered_sup['Flights_num'].sum()
@@ -518,7 +521,6 @@ else:
                     st.plotly_chart(fig_s3, use_container_width=True)
             
             with cs4:
-                # 4. 출발 월별 공급 분포 -> 막대그래프(Bar Chart)
                 if '출발 월' in filtered_sup.columns:
                     sup_month_df = filtered_sup.groupby('출발 월')[target_val].sum().reset_index()
                     fig_s4 = px.bar(
@@ -533,6 +535,33 @@ else:
                     )
                     fig_s4.update_layout(yaxis_title=f"공급 ({'좌석수' if '공급석' in metric_mode else '편수'})")
                     st.plotly_chart(fig_s4, use_container_width=True)
+
+            st.markdown("---")
+            st.subheader("🎯 특정 노선 선택 및 시간대별 공급 분석")
+            available_routes = sorted(filtered_sup['노선'].dropna().unique().tolist())
+            if available_routes:
+                col_sel_route, _ = st.columns([2, 2])
+                with col_sel_route:
+                    selected_single_route = st.selectbox("📌 분석할 노선을 선택하세요:", options=available_routes)
+                
+                df_route_time = filtered_sup[filtered_sup['노선'] == selected_single_route]
+                if not df_route_time.empty and '출발 시간대' in df_route_time.columns:
+                    df_rt_grp = df_route_time.groupby(['Airline', '출발 시간대'])[target_val].sum().reset_index()
+                    rt_al_order = [al for al in sup_airlines if al in df_rt_grp['Airline'].unique()]
+                    
+                    fig_s5 = px.bar(
+                        df_rt_grp, x='Airline', y=target_val, color='출발 시간대',
+                        title=f'5. [{selected_single_route}] 노선 - 항공사별 출발 시간대 공급 분포 ({metric_mode.split()[0]})',
+                        barmode='stack', text=target_val,
+                        category_orders={'Airline': rt_al_order},
+                        color_discrete_sequence=px.colors.qualitative.Pastel
+                    )
+                    fig_s5.update_traces(
+                        texttemplate='%{text:,.0f}', textposition='inside',
+                        hovertemplate="<b>항공사: %{x}</b><br>시간대: %{fullData.name}<br>공급량: %{y:,.0f}<extra></extra>"
+                    )
+                    fig_s5.update_layout(xaxis_title="항공사", yaxis_title=f"공급 ({'좌석수' if '공급석' in metric_mode else '편수'})")
+                    st.plotly_chart(fig_s5, use_container_width=True)
 
     with tab_s2:
         st.markdown(f"##### 📌 노선 및 출발월별 공급 M/S 매트릭스 ({metric_mode})")
