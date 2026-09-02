@@ -216,7 +216,7 @@ if st.session_state["raw_df"] is not None:
         df["Estimated Count"] = df["Weight"]
 
     # ---------------------------------------------------------
-    # 🎛️ 좌측 사이드바 슬라이서
+    # 🎛️ 좌측 사이드바 슬라이서 (Pills / 나열형 버튼 방식)
     # ---------------------------------------------------------
     st.sidebar.header("🎛️ 대시보드 필터 (슬라이서)")
 
@@ -224,10 +224,12 @@ if st.session_state["raw_df"] is not None:
 
     # 1. KE 취항 여부 필터
     if "KE 취항 여부" in df.columns:
-        ke_opt = st.sidebar.radio(
-            "1. KE 취항 여부",
+        st.sidebar.markdown("**1. KE 취항 여부**")
+        ke_opt = st.sidebar.pills(
+            "KE 취항 여부 선택",
             ["전체", "KE 취항 노선만", "KE 미취항 노선만"],
-            index=1,
+            default="KE 취항 노선만",
+            label_visibility="collapsed"
         )
         if ke_opt == "KE 취항 노선만":
             filtered_df = filtered_df[filtered_df["KE 취항 여부"] == "KE 취항"]
@@ -237,78 +239,90 @@ if st.session_state["raw_df"] is not None:
     # 2. Route Code 필터
     selected_routes = []
     if "Route Code" in filtered_df.columns:
+        st.sidebar.markdown("**2. Route Code (노선 선택)**")
         route_counts = filtered_df["Route Code"].value_counts()
         ke_routes_sorted = [r for r in route_counts.index if r in KE_ROUTES]
         non_ke_routes_sorted = [r for r in route_counts.index if r not in KE_ROUTES]
         available_routes = ke_routes_sorted + non_ke_routes_sorted
 
-        selected_routes = st.sidebar.multiselect(
-            "2. Route Code (노선 선택)",
+        selected_routes = st.sidebar.pills(
+            "Route Code 선택",
             options=["전체 (통합 보기)"] + available_routes,
-            default=[],
-            placeholder="선택 안 함 (전체 통합 보기)",
+            selection_mode="multi",
+            default=["전체 (통합 보기)"],
+            label_visibility="collapsed"
         )
         if selected_routes and "전체 (통합 보기)" not in selected_routes:
             filtered_df = filtered_df[filtered_df["Route Code"].isin(selected_routes)]
-        elif "전체 (통합 보기)" in selected_routes:
+        else:
             selected_routes = []
 
     # 3. Sales Channel 필터
     if "Sales Channel" in filtered_df.columns:
+        st.sidebar.markdown("**3. Sales Channel (직판/간판)**")
         channels = sorted(filtered_df["Sales Channel"].dropna().unique().tolist())
-        selected_channels = st.sidebar.multiselect(
-            "3. Sales Channel (직판/간판)",
+        selected_channels = st.sidebar.pills(
+            "Sales Channel 선택",
             options=["전체"] + channels,
-            default=[],
-            placeholder="선택 안 함 (전체)",
+            selection_mode="multi",
+            default=["전체"],
+            label_visibility="collapsed"
         )
         if selected_channels and "전체" not in selected_channels:
             filtered_df = filtered_df[filtered_df["Sales Channel"].isin(selected_channels)]
 
     # 4. Purchase Week 필터
     if "Purchase Week" in filtered_df.columns:
+        st.sidebar.markdown("**4. Purchase Week (구매 주차)**")
         weeks = sorted(filtered_df["Purchase Week"].dropna().unique().tolist())
-        selected_weeks = st.sidebar.multiselect(
-            "4. Purchase Week (구매 주차)",
+        selected_weeks = st.sidebar.pills(
+            "Purchase Week 선택",
             options=["전체"] + weeks,
-            default=[],
-            placeholder="선택 안 함 (전체)",
+            selection_mode="multi",
+            default=["전체"],
+            label_visibility="collapsed"
         )
         if selected_weeks and "전체" not in selected_weeks:
             filtered_df = filtered_df[filtered_df["Purchase Week"].isin(selected_weeks)]
 
     # 5. Bound 필터
     if "Bound" in filtered_df.columns:
+        st.sidebar.markdown("**5. Bound (IN/OUT)**")
         bounds = sorted(filtered_df["Bound"].dropna().unique().tolist())
-        selected_bounds = st.sidebar.multiselect(
-            "5. Bound (IN/OUT)",
+        selected_bounds = st.sidebar.pills(
+            "Bound 선택",
             options=["전체"] + bounds,
-            default=[],
-            placeholder="선택 안 함 (전체)",
+            selection_mode="multi",
+            default=["전체"],
+            label_visibility="collapsed"
         )
         if selected_bounds and "전체" not in selected_bounds:
             filtered_df = filtered_df[filtered_df["Bound"].isin(selected_bounds)]
 
     # 6. Ticket Travel Month 필터
     if "Ticket Travel Month" in filtered_df.columns:
+        st.sidebar.markdown("**6. Ticket Travel Month (여행 월)**")
         months = sorted(filtered_df["Ticket Travel Month"].dropna().unique().tolist())
-        selected_months = st.sidebar.multiselect(
-            "6. Ticket Travel Month (여행 월)",
+        selected_months = st.sidebar.pills(
+            "Ticket Travel Month 선택",
             options=["전체"] + months,
-            default=[],
-            placeholder="선택 안 함 (전체)",
+            selection_mode="multi",
+            default=["전체"],
+            label_visibility="collapsed"
         )
         if selected_months and "전체" not in selected_months:
             filtered_df = filtered_df[filtered_df["Ticket Travel Month"].isin(selected_months)]
 
     # 7. Time Slot 필터
     if "Time Slot" in filtered_df.columns:
+        st.sidebar.markdown("**7. Time Slot (출발 시간대)**")
         slots = sorted(filtered_df["Time Slot"].dropna().unique().tolist())
-        selected_slots = st.sidebar.multiselect(
-            "7. Time Slot (출발 시간대)",
+        selected_slots = st.sidebar.pills(
+            "Time Slot 선택",
             options=["전체"] + slots,
-            default=[],
-            placeholder="선택 안 함 (전체)",
+            selection_mode="multi",
+            default=["전체"],
+            label_visibility="collapsed"
         )
         if selected_slots and "전체" not in selected_slots:
             filtered_df = filtered_df[filtered_df["Time Slot"].isin(selected_slots)]
@@ -444,6 +458,45 @@ if st.session_state["raw_df"] is not None:
                 with tab2:
                     st.subheader(table_title_cnt)
                     st.dataframe(pivot_est.map(lambda x: f"{x:,.1f}"), width="stretch")
+
+    st.divider()
+
+    # ---------------------------------------------------------
+    # 🍕 추가: Sales Channel & Bound 별 원 그래프 (Pie Chart)
+    # ---------------------------------------------------------
+    st.subheader("🍕 세부 비중 분석 (Sales Channel & Bound)")
+    
+    col_pie1, col_pie2 = st.columns(2)
+
+    with col_pie1:
+        if "Sales Channel" in filtered_df.columns:
+            sc_df = filtered_df.groupby("Sales Channel")["Estimated Count"].sum().reset_index()
+            fig_sc = px.pie(
+                sc_df,
+                values="Estimated Count",
+                names="Sales Channel",
+                title="<b>Sales Channel별 추정 비중</b>",
+                hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Set2
+            )
+            fig_sc.update_traces(textinfo="label+percent", textfont_size=13)
+            fig_sc.update_layout(height=400, showlegend=True)
+            st.plotly_chart(fig_sc, width="stretch")
+
+    with col_pie2:
+        if "Bound" in filtered_df.columns:
+            bound_df = filtered_df.groupby("Bound")["Estimated Count"].sum().reset_index()
+            fig_bound = px.pie(
+                bound_df,
+                values="Estimated Count",
+                names="Bound",
+                title="<b>Bound(IN/OUT)별 추정 비중</b>",
+                hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            fig_bound.update_traces(textinfo="label+percent", textfont_size=13)
+            fig_bound.update_layout(height=400, showlegend=True)
+            st.plotly_chart(fig_bound, width="stretch")
 
     st.divider()
 
