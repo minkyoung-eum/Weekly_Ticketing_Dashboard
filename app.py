@@ -9,19 +9,15 @@ st.set_page_config(
     page_title="주차별 발매 분석 대시보드", layout="wide"
 )
 
-# 세션 상태(st.session_state) 초기화
+# 세션 상태 초기화
 if "raw_df" not in st.session_state:
     st.session_state["raw_df"] = None
 if "weight_df" not in st.session_state:
     st.session_state["weight_df"] = None
 
 
-# ---------------------------------------------------------
-# 🚀 메모리 절약형 데이터 캐싱 및 가공 함수
-# ---------------------------------------------------------
 @st.cache_data(max_entries=2, show_spinner=False)
 def load_uploaded_file(file_bytes, filename):
-    """파일 업로드 시 메모리를 절약하며 불러오기"""
     if filename.endswith(".csv"):
         df = pd.read_csv(io.BytesIO(file_bytes))
     else:
@@ -71,7 +67,6 @@ def classify_flight_time(time_val):
         return "기타"
 
 
-# KE 취항 노선 목록 정의
 KE_ROUTES = {
     "G/HND", "I/NRT", "I/HND", "P/NRT", "C/NRT", "I/KIX", "G/KIX", "I/UKB",
     "I/OKJ", "I/HIJ", "I/FUK", "I/KOJ", "I/NGS", "I/KMJ", "I/OIT", "I/NGO",
@@ -79,7 +74,7 @@ KE_ROUTES = {
 }
 
 
-# 메인 대시보드 타이틀
+# 메인 타이틀
 st.title("✈️ 주차별 발매 분석 대시보드")
 
 col_up1, col_up2 = st.columns(2)
@@ -98,18 +93,15 @@ with col_up2:
         st.session_state["weight_df"] = load_uploaded_file(weight_file.getvalue(), weight_file.name)
 
 
-# RAW DATA가 있을 때 가공 및 집계 로직 실행
 if st.session_state["raw_df"] is not None:
     df = st.session_state["raw_df"].copy()
 
-    with st.spinner("데이터를 최적화하고 처리하는 중입니다..."):
-        # 1. Purchase Week 생성
+    with st.spinner("데이터를 분석 처리 중입니다..."):
         if "Ticket Purchase Date" in df.columns:
             df["Purchase Week"] = df["Ticket Purchase Date"].apply(get_iso_month_week)
         elif "Purchase Date" in df.columns:
             df["Purchase Week"] = df["Purchase Date"].apply(get_iso_month_week)
 
-        # 2. Bound 생성
         has_origin_cntry = "Trip Origin Country Code" in df.columns
         has_dest_cntry = "Trip Destination Country Code" in df.columns
 
@@ -126,11 +118,9 @@ if st.session_state["raw_df"] is not None:
 
             df["Bound"] = df.apply(get_bound, axis=1)
 
-        # 3. Time Slot 생성
         if "Flight Departure Time" in df.columns:
             df["Time Slot"] = df["Flight Departure Time"].apply(classify_flight_time)
 
-        # 4. Route Code & KE 취항 여부 필드 생성
         orig_code_col = next((c for c in df.columns if "orig" in c.lower() and "cntry" not in c.lower()), None)
         dest_code_col = next((c for c in df.columns if "dest" in c.lower() and "cntry" not in c.lower()), None)
 
@@ -164,7 +154,6 @@ if st.session_state["raw_df"] is not None:
 
             df[["Route Code", "KE 취항 여부"]] = df.apply(process_route_and_ke, axis=1)
 
-        # 5. Sales Channel 생성
         source_col = next((c for c in df.columns if "source" in c.lower()), None)
         if source_col:
             def classify_sales_channel(val):
@@ -178,7 +167,6 @@ if st.session_state["raw_df"] is not None:
 
             df["Sales Channel"] = df[source_col].apply(classify_sales_channel)
 
-        # 6. 출발월(00월) 필드 가공
         if "Ticket Travel Month" in df.columns:
             def format_month(val):
                 if pd.isna(val):
@@ -190,7 +178,6 @@ if st.session_state["raw_df"] is not None:
                     return str(val)
             df["출발월"] = df["Ticket Travel Month"].apply(format_month)
 
-        # 7. 가중치(Weight) 매핑 및 안전한 숫자형 변환 (에러 방지 핵심)
         airline_col = "Dominant Marketing Airline"
         df["Weight"] = 1.0
 
@@ -206,7 +193,6 @@ if st.session_state["raw_df"] is not None:
                 weight_df_sub = weight_df[[w_route_col, w_air_col, w_val_col]].dropna()
                 weight_df_sub.columns = ["Route Code", airline_col, "Weight_Val"]
 
-                # 가중치 수치 강제 숫자 변환
                 weight_df_sub["Weight_Val"] = pd.to_numeric(weight_df_sub["Weight_Val"], errors="coerce").fillna(1.0)
 
                 df = df.merge(weight_df_sub, on=["Route Code", airline_col], how="left")
@@ -214,134 +200,108 @@ if st.session_state["raw_df"] is not None:
                 df.drop(columns=["Weight_Val"], inplace=True, errors="ignore")
                 st.sidebar.info("💡 가중치 테이블 적용 완료")
 
-        # Estimated Count를 강제로 float 수치형으로 보장하여 .sum() TypeError 방지
         df["Estimated Count"] = pd.to_numeric(df["Weight"], errors="coerce").fillna(1.0)
 
     # ---------------------------------------------------------
-    # 🎛️ 좌측 사이드바 슬라이서 (Pills 방식)
+    # 🎛️ 사이드바 필터
     # ---------------------------------------------------------
-    st.sidebar.header("🎛️ 대시보드 필터 (슬라이서)")
+    st.sidebar.header("🎛️ 대시보드 필터")
 
     filtered_df = df
 
-    # 1. KE 취항 여부 필터
     if "KE 취항 여부" in df.columns:
-        st.sidebar.markdown("**1. KE 취항 여부**")
-        ke_opt = st.sidebar.pills(
-            "KE 취항 여부 선택",
+        ke_opt = st.sidebar.radio(
+            "1. KE 취항 여부",
             ["전체", "KE 취항 노선만", "KE 미취항 노선만"],
-            default="KE 취항 노선만",
-            label_visibility="collapsed"
+            index=1,
         )
         if ke_opt == "KE 취항 노선만":
             filtered_df = filtered_df[filtered_df["KE 취항 여부"] == "KE 취항"]
         elif ke_opt == "KE 미취항 노선만":
             filtered_df = filtered_df[filtered_df["KE 취항 여부"] == "KE 미취항"]
 
-    # 2. Route Code 필터
     selected_routes = []
     if "Route Code" in filtered_df.columns:
-        st.sidebar.markdown("**2. Route Code (노선 선택)**")
         route_counts = filtered_df["Route Code"].value_counts()
         ke_routes_sorted = [r for r in route_counts.index if r in KE_ROUTES]
         non_ke_routes_sorted = [r for r in route_counts.index if r not in KE_ROUTES]
         available_routes = ke_routes_sorted + non_ke_routes_sorted
 
-        selected_routes = st.sidebar.pills(
-            "Route Code 선택",
+        selected_routes = st.sidebar.multiselect(
+            "2. Route Code (노선 선택)",
             options=["전체 (통합 보기)"] + available_routes,
-            selection_mode="multi",
-            default=["전체 (통합 보기)"],
-            label_visibility="collapsed"
+            default=[],
+            placeholder="선택 안 함 (전체 통합 보기)",
         )
         if selected_routes and "전체 (통합 보기)" not in selected_routes:
             filtered_df = filtered_df[filtered_df["Route Code"].isin(selected_routes)]
         else:
             selected_routes = []
 
-    # 3. Sales Channel 필터
     if "Sales Channel" in filtered_df.columns:
-        st.sidebar.markdown("**3. Sales Channel (직판/간판)**")
         channels = sorted(filtered_df["Sales Channel"].dropna().unique().tolist())
-        selected_channels = st.sidebar.pills(
-            "Sales Channel 선택",
+        selected_channels = st.sidebar.multiselect(
+            "3. Sales Channel (직판/간판)",
             options=["전체"] + channels,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
+            default=[],
+            placeholder="선택 안 함 (전체)",
         )
         if selected_channels and "전체" not in selected_channels:
             filtered_df = filtered_df[filtered_df["Sales Channel"].isin(selected_channels)]
 
-    # 4. Purchase Week 필터
     if "Purchase Week" in filtered_df.columns:
-        st.sidebar.markdown("**4. Purchase Week (구매 주차)**")
         weeks = sorted(filtered_df["Purchase Week"].dropna().unique().tolist())
-        selected_weeks = st.sidebar.pills(
-            "Purchase Week 선택",
+        selected_weeks = st.sidebar.multiselect(
+            "4. Purchase Week (구매 주차)",
             options=["전체"] + weeks,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
+            default=[],
+            placeholder="선택 안 함 (전체)",
         )
         if selected_weeks and "전체" not in selected_weeks:
             filtered_df = filtered_df[filtered_df["Purchase Week"].isin(selected_weeks)]
 
-    # 5. Bound 필터
     if "Bound" in filtered_df.columns:
-        st.sidebar.markdown("**5. Bound (IN/OUT)**")
         bounds = sorted(filtered_df["Bound"].dropna().unique().tolist())
-        selected_bounds = st.sidebar.pills(
-            "Bound 선택",
+        selected_bounds = st.sidebar.multiselect(
+            "5. Bound (IN/OUT)",
             options=["전체"] + bounds,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
+            default=[],
+            placeholder="선택 안 함 (전체)",
         )
         if selected_bounds and "전체" not in selected_bounds:
             filtered_df = filtered_df[filtered_df["Bound"].isin(selected_bounds)]
 
-    # 6. 출발월 필터 (00월 형식)
     if "출발월" in filtered_df.columns:
-        st.sidebar.markdown("**6. 출발월**")
         months = sorted([m for m in filtered_df["출발월"].dropna().unique().tolist() if m != ""])
-        selected_months = st.sidebar.pills(
-            "출발월 선택",
+        selected_months = st.sidebar.multiselect(
+            "6. 출발월",
             options=["전체"] + months,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
+            default=[],
+            placeholder="선택 안 함 (전체)",
         )
         if selected_months and "전체" not in selected_months:
             filtered_df = filtered_df[filtered_df["출발월"].isin(selected_months)]
 
-    # 7. Time Slot 필터
     if "Time Slot" in filtered_df.columns:
-        st.sidebar.markdown("**7. Time Slot (출발 시간대)**")
         slots = sorted(filtered_df["Time Slot"].dropna().unique().tolist())
-        selected_slots = st.sidebar.pills(
-            "Time Slot 선택",
+        selected_slots = st.sidebar.multiselect(
+            "7. Time Slot (출발 시간대)",
             options=["전체"] + slots,
-            selection_mode="multi",
-            default=["전체"],
-            label_visibility="collapsed"
+            default=[],
+            placeholder="선택 안 함 (전체)",
         )
         if selected_slots and "전체" not in selected_slots:
             filtered_df = filtered_df[filtered_df["Time Slot"].isin(selected_slots)]
 
     # ---------------------------------------------------------
-    # 📊 메인 화면 표출
+    # 📊 메인 화면
     # ---------------------------------------------------------
     st.success(f"✅ 데이터 분석 준비 완료 (적용 건수: {len(filtered_df):,} 건)")
 
-    # 안전하게 float 타입으로 sum 구하기
     total_est_count = float(filtered_df["Estimated Count"].sum())
 
     st.divider()
 
-    # ---------------------------------------------------------
-    # 🎯 항공사별 발매 점유비 분석 (가중치 적용 추정치 기준)
-    # ---------------------------------------------------------
     st.subheader("🎯 항공사별 발매 점유비 (가중치 추정 반영)")
 
     if airline_col not in df.columns:
@@ -449,9 +409,6 @@ if st.session_state["raw_df"] is not None:
 
     st.divider()
 
-    # ---------------------------------------------------------
-    # 🍕 Sales Channel & Bound 별 원 그래프 (Pie Chart)
-    # ---------------------------------------------------------
     st.subheader("🍕 세부 비중 분석 (Sales Channel & Bound)")
     
     col_pie1, col_pie2 = st.columns(2)
@@ -488,7 +445,6 @@ if st.session_state["raw_df"] is not None:
 
     st.divider()
 
-    # 데이터 미리보기 및 다운로드
     st.subheader("📋 가공 완료 데이터 미리보기 (가중치 및 추정건수 포함)")
     new_cols = [
         c
@@ -509,7 +465,7 @@ if st.session_state["raw_df"] is not None:
     final_df = filtered_df[new_cols + other_cols]
 
     st.dataframe(final_df.head(50), width="stretch")
-    st.caption("※ 화면 튕김 방지를 위해 미리보기는 상위 50건만 표출됩니다. 전체 데이터는 아래 엑셀 다운로드 버튼을 이용하세요.")
+    st.caption("※ 안정적인 구동을 위해 미리보기는 상위 50건만 표출되며, 전체 데이터는 아래 엑셀 다운로드 버튼을 이용하세요.")
 
     st.subheader("📥 필터 및 추정 반영 데이터 엑셀 다운로드")
     output = io.BytesIO()
