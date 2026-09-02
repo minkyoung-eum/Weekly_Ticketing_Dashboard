@@ -81,34 +81,40 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data
-def load_all_data():
-    ticketing_path = 'Ticketing-test_2.csv'
-    weight_path = '가중치 파일.csv'
-    
-    # Try loading new supply csv first, fallback to excel
-    supply_csv_path = '공급 (9월 1주).csv'
-    supply_excel_path = '공급.xlsx'
-    
-    df_ticketing, df_weight, df_supply = None, None, None
-    
-    if os.path.exists(ticketing_path):
-        df_ticketing = pd.read_csv(ticketing_path, low_memory=False)
-        cols_to_drop = [c for c in df_ticketing.columns if 'Unnamed' in c]
-        if cols_to_drop:
-            df_ticketing = df_ticketing.drop(columns=cols_to_drop)
-            
-    if os.path.exists(weight_path):
-        df_weight = pd.read_csv(weight_path)
-        
-    if os.path.exists(supply_csv_path):
-        df_supply = pd.read_csv(supply_csv_path, low_memory=False)
-    elif os.path.exists(supply_excel_path):
-        df_supply = pd.read_excel(supply_excel_path, sheet_name='공급_RAW')
-        
-    return df_ticketing, df_weight, df_supply
+# Sidebar File Uploader Section
+st.sidebar.header("📁 데이터 파일 업로드")
 
-df_iss_raw, df_wt_raw, df_sup_raw = load_all_data()
+uploaded_iss = st.sidebar.file_uploader("1. 발매 데이터 (Ticketing-test_2.csv)", type=['csv'])
+uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (가중치 파일.csv)", type=['csv'])
+uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (공급.csv/xlsx)", type=['csv', 'xlsx'])
+
+# Load Logic Function
+@st.cache_data
+def load_data_from_disk():
+    df_iss, df_wt, df_sup = None, None, None
+    if os.path.exists('Ticketing-test_2.csv'):
+        df_iss = pd.read_csv('Ticketing-test_2.csv', low_memory=False)
+    if os.path.exists('가중치 파일.csv'):
+        df_wt = pd.read_csv('가중치 파일.csv')
+    if os.path.exists('공급 (9월 1주).csv'):
+        df_sup = pd.read_csv('공급 (9월 1주).csv', low_memory=False)
+    elif os.path.exists('공급.xlsx'):
+        df_sup = pd.read_excel('공급.xlsx', sheet_name='공급_RAW')
+    return df_iss, df_wt, df_sup
+
+disk_iss, disk_wt, disk_sup = load_data_from_disk()
+
+# Priority: Uploaded File > Disk File
+df_iss_raw = pd.read_csv(uploaded_iss, low_memory=False) if uploaded_iss else disk_iss
+df_wt_raw = pd.read_csv(uploaded_wt) if uploaded_wt else disk_wt
+
+if uploaded_sup:
+    if uploaded_sup.name.endswith('.csv'):
+        df_sup_raw = pd.read_csv(uploaded_sup, low_memory=False)
+    else:
+        df_sup_raw = pd.read_excel(uploaded_sup, sheet_name='공급_RAW')
+else:
+    df_sup_raw = disk_sup
 
 # Header Notice
 st.title("✈️ 항공사 노선별 M/S 대시보드")
@@ -134,7 +140,7 @@ ALL_OPTION = "전체 (All)"
 # ==========================================
 if dashboard_mode == "🎟️ 발매 M/S 대시보드":
     if df_iss_raw is None or df_wt_raw is None:
-        st.warning("발매 데이터(Ticketing-test_2.csv) 또는 가중치 파일(가중치 파일.csv)이 필요합니다.")
+        st.info("👈 좌측 사이드바에서 [Ticketing-test_2.csv]와 [가중치 파일.csv]를 업로드해주세요.")
         st.stop()
 
     df = df_iss_raw.copy()
@@ -163,6 +169,7 @@ if dashboard_mode == "🎟️ 발매 M/S 대시보드":
     raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
     all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
+    st.sidebar.markdown("---")
     st.sidebar.header("🔍 발매 대시보드 필터")
     with st.sidebar.form("iss_filter_form"):
         apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
@@ -271,15 +278,12 @@ if dashboard_mode == "🎟️ 발매 M/S 대시보드":
 # ==========================================
 else:
     if df_sup_raw is None:
-        st.warning("공급 데이터(공급 (9월 1주).csv) 파일이 필요합니다.")
+        st.info("👈 좌측 사이드바에서 [공급 (9월 1주).csv] 파일을 업로드해주세요.")
         st.stop()
 
     df_sup = df_sup_raw.copy()
-    
-    # Clean Column Names & Numeric Values
     df_sup.columns = [c.strip() for c in df_sup.columns]
     
-    # Airline Column Normalize
     if 'Op Airline Code' in df_sup.columns:
         df_sup['Airline'] = df_sup['Op Airline Code']
     elif 'Mkt Al' in df_sup.columns:
@@ -287,7 +291,6 @@ else:
     else:
         df_sup['Airline'] = 'Unknown'
 
-    # Clean Seats & Flights
     if 'Seats' in df_sup.columns:
         df_sup['Seats_num'] = pd.to_numeric(df_sup['Seats'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     else:
@@ -298,7 +301,6 @@ else:
     else:
         df_sup['Flights_num'] = 1
 
-    # Filter Options
     sup_routes = df_sup.groupby('노선')['Seats_num'].sum().sort_values(ascending=False).index.tolist()
     sup_months = sorted([str(x) for x in df_sup['출발 월'].dropna().unique()]) if '출발 월' in df_sup.columns else []
     sup_time_cats = sorted([str(x) for x in df_sup['출발 시간대'].dropna().unique()]) if '출발 시간대' in df_sup.columns else []
@@ -307,6 +309,7 @@ else:
     raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
     sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
 
+    st.sidebar.markdown("---")
     st.sidebar.header("🔍 공급 대시보드 필터")
     with st.sidebar.form("sup_filter_form"):
         metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
@@ -326,7 +329,6 @@ else:
 
     target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
 
-    # Filtering Logic
     filter_mask = (
         (df_sup['노선'].astype(str).isin(selected_sup_routes)) &
         (df_sup['Airline'].astype(str).isin(selected_sup_airlines))
@@ -342,7 +344,6 @@ else:
 
     color_discrete_map = {'KE': '#00A1E9'}
 
-    # Top KPI Cards
     col_s1, col_s2, col_s3, col_s4 = st.columns(4)
     total_seats = filtered_sup['Seats_num'].sum()
     total_flights = filtered_sup['Flights_num'].sum()
