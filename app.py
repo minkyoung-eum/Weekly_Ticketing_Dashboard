@@ -115,31 +115,37 @@ st.sidebar.header("🔍 대시보드 필터 (Slicers)")
 apply_weight_toggle = st.sidebar.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
 val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-# 노선 발매량 순 정렬 목록 산출
+ALL_OPTION = "전체 (All)"
+
+def get_filter_selection(label, full_list, default_to_all=True):
+    options = [ALL_OPTION] + full_list
+    default = [ALL_OPTION] if default_to_all else options
+    selected = st.sidebar.multiselect(label, options=options, default=default)
+    
+    if ALL_OPTION in selected or not selected:
+        return full_list
+    return selected
+
+# 노선 발매량 순 정렬 목록
 route_order_list = merged_df.groupby('노선')[val_col].sum().sort_values(ascending=False).index.tolist()
-
-# 1. 노선 (Default: 전체 선택)
-selected_routes = st.sidebar.multiselect("노선 (발매량 순)", options=route_order_list, default=route_order_list)
-
-# 2. 출발 월 (Default: 전체 선택)
 all_dep_months = sorted([str(x) for x in merged_df['출발 월'].dropna().unique()])
-selected_dep_months = st.sidebar.multiselect("출발 월", options=all_dep_months, default=all_dep_months)
-
-# 3. Bound (Default: 전체 선택)
 all_bounds = sorted([str(x) for x in merged_df['Bound'].dropna().unique()])
-selected_bounds = st.sidebar.multiselect("Bound", options=all_bounds, default=all_bounds)
-
-# 4. Ticket Type (Default: 전체 선택)
 all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
-selected_ticket_types = st.sidebar.multiselect("Ticket Type (여정)", options=all_ticket_types, default=all_ticket_types)
-
-# 5. 판매채널 (Default: 전체 선택)
 all_channels = sorted([str(x) for x in merged_df['판매채널'].dropna().unique()])
-selected_channels = st.sidebar.multiselect("판매채널", options=all_channels, default=all_channels)
-
-# 6. 항공사 (Default: 전체 선택)
 all_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
-selected_airlines = st.sidebar.multiselect("항공사", options=all_airlines, default=all_airlines)
+
+# 1. 노선
+selected_routes = get_filter_selection("노선 (발매량 순)", route_order_list)
+# 2. 출발 월
+selected_dep_months = get_filter_selection("출발 월", all_dep_months)
+# 3. Bound
+selected_bounds = get_filter_selection("Bound", all_bounds)
+# 4. Ticket Type (여정)
+selected_ticket_types = get_filter_selection("Ticket Type (여정)", all_ticket_types)
+# 5. 판매채널
+selected_channels = get_filter_selection("판매채널", all_channels)
+# 6. 항공사
+selected_airlines = get_filter_selection("항공사", all_airlines)
 
 # Filter Dataset
 filtered_df = merged_df[
@@ -182,7 +188,7 @@ with col_m4:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Main Content: First Tab = Visualization Charts
+# Main Content
 tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "📋 Raw Data & Weight Match View"])
 
 with tab1:
@@ -352,4 +358,4 @@ with tab2:
 with tab3:
     st.subheader("📋 Data Raw & Weight Match View")
     st.markdown("##### 가중치(Weight_num) 매칭 및 최종 Weighted_Value 적용 데이터")
-    st.dataframe(filtered_df[['노선', 'Dominant Marketing Airline', '발매주차', '출발 월', 'Bound', 'Ticket Type', '판매채널', 'Value', 'Weight_num', 'Weighted_Value']], use_container_width=True))
+    st.dataframe(filtered_df[['노선', 'Dominant Marketing Airline', '발매주차', '출발 월', 'Bound', 'Ticket Type', '판매채널', 'Value', 'Weight_num', 'Weighted_Value']], use_container_width=True)
