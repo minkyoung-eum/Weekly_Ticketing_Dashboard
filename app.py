@@ -16,6 +16,9 @@ if "weight_df" not in st.session_state:
     st.session_state["weight_df"] = None
 
 
+# ---------------------------------------------------------
+# 🚀 속도 개선 핵심: 메모리 가공 및 카테고리 형변환 최적화
+# ---------------------------------------------------------
 @st.cache_data(max_entries=2, show_spinner=False)
 def load_uploaded_file(file_bytes, filename):
     if filename.endswith(".csv"):
@@ -96,7 +99,7 @@ with col_up2:
 if st.session_state["raw_df"] is not None:
     df = st.session_state["raw_df"].copy()
 
-    with st.spinner("데이터를 분석 처리 중입니다..."):
+    with st.spinner("데이터 속도를 최적화하는 중입니다..."):
         if "Ticket Purchase Date" in df.columns:
             df["Purchase Week"] = df["Ticket Purchase Date"].apply(get_iso_month_week)
         elif "Purchase Date" in df.columns:
@@ -192,7 +195,6 @@ if st.session_state["raw_df"] is not None:
             if w_route_col and w_air_col and w_val_col:
                 weight_df_sub = weight_df[[w_route_col, w_air_col, w_val_col]].dropna()
                 weight_df_sub.columns = ["Route Code", airline_col, "Weight_Val"]
-
                 weight_df_sub["Weight_Val"] = pd.to_numeric(weight_df_sub["Weight_Val"], errors="coerce").fillna(1.0)
 
                 df = df.merge(weight_df_sub, on=["Route Code", airline_col], how="left")
@@ -201,6 +203,12 @@ if st.session_state["raw_df"] is not None:
                 st.sidebar.info("💡 가중치 테이블 적용 완료")
 
         df["Estimated Count"] = pd.to_numeric(df["Weight"], errors="coerce").fillna(1.0)
+
+        # ⚡ 핵심 속도 최적화: 주요 검색 대상 컬럼들을 category 형으로 변환하여 메모리 최소화
+        cat_cols = ["KE 취항 여부", "Route Code", "Sales Channel", "Purchase Week", "Bound", "출발월", "Time Slot", airline_col]
+        for col in cat_cols:
+            if col in df.columns:
+                df[col] = df[col].astype("category")
 
     # ---------------------------------------------------------
     # 🎛️ 사이드바 필터
@@ -239,7 +247,7 @@ if st.session_state["raw_df"] is not None:
             selected_routes = []
 
     if "Sales Channel" in filtered_df.columns:
-        channels = sorted(filtered_df["Sales Channel"].dropna().unique().tolist())
+        channels = sorted([str(x) for x in filtered_df["Sales Channel"].dropna().unique().tolist()])
         selected_channels = st.sidebar.multiselect(
             "3. Sales Channel (직판/간판)",
             options=["전체"] + channels,
@@ -250,7 +258,7 @@ if st.session_state["raw_df"] is not None:
             filtered_df = filtered_df[filtered_df["Sales Channel"].isin(selected_channels)]
 
     if "Purchase Week" in filtered_df.columns:
-        weeks = sorted(filtered_df["Purchase Week"].dropna().unique().tolist())
+        weeks = sorted([str(x) for x in filtered_df["Purchase Week"].dropna().unique().tolist()])
         selected_weeks = st.sidebar.multiselect(
             "4. Purchase Week (구매 주차)",
             options=["전체"] + weeks,
@@ -261,7 +269,7 @@ if st.session_state["raw_df"] is not None:
             filtered_df = filtered_df[filtered_df["Purchase Week"].isin(selected_weeks)]
 
     if "Bound" in filtered_df.columns:
-        bounds = sorted(filtered_df["Bound"].dropna().unique().tolist())
+        bounds = sorted([str(x) for x in filtered_df["Bound"].dropna().unique().tolist()])
         selected_bounds = st.sidebar.multiselect(
             "5. Bound (IN/OUT)",
             options=["전체"] + bounds,
@@ -272,7 +280,7 @@ if st.session_state["raw_df"] is not None:
             filtered_df = filtered_df[filtered_df["Bound"].isin(selected_bounds)]
 
     if "출발월" in filtered_df.columns:
-        months = sorted([m for m in filtered_df["출발월"].dropna().unique().tolist() if m != ""])
+        months = sorted([str(x) for x in filtered_df["출발월"].dropna().unique().tolist() if str(x) != ""])
         selected_months = st.sidebar.multiselect(
             "6. 출발월",
             options=["전체"] + months,
@@ -283,7 +291,7 @@ if st.session_state["raw_df"] is not None:
             filtered_df = filtered_df[filtered_df["출발월"].isin(selected_months)]
 
     if "Time Slot" in filtered_df.columns:
-        slots = sorted(filtered_df["Time Slot"].dropna().unique().tolist())
+        slots = sorted([str(x) for x in filtered_df["Time Slot"].dropna().unique().tolist()])
         selected_slots = st.sidebar.multiselect(
             "7. Time Slot (출발 시간대)",
             options=["전체"] + slots,
@@ -317,7 +325,7 @@ if st.session_state["raw_df"] is not None:
                 table_title_pct = f"[{selected_routes[0]}] 노선 항공사 추정 점유율 (%)"
                 table_title_cnt = f"[{selected_routes[0]}] 노선 항공사 추정 발권 건수 (건)"
 
-            est_counts = filtered_df.groupby(airline_col)["Estimated Count"].sum().sort_values(ascending=False)
+            est_counts = filtered_df.groupby(airline_col, observed=True)["Estimated Count"].sum().sort_values(ascending=False)
             raw_counts = filtered_df[airline_col].value_counts()
 
             if est_counts.empty:
@@ -375,7 +383,7 @@ if st.session_state["raw_df"] is not None:
             table_title_cnt = "선택한 Route Code별 항공사 추정 발권 건수 (건)"
 
             pivot_est = (
-                filtered_df.groupby(["Route Code", airline_col])["Estimated Count"]
+                filtered_df.groupby(["Route Code", airline_col], observed=True)["Estimated Count"]
                 .sum()
                 .unstack(fill_value=0)
             )
@@ -415,7 +423,7 @@ if st.session_state["raw_df"] is not None:
 
     with col_pie1:
         if "Sales Channel" in filtered_df.columns:
-            sc_df = filtered_df.groupby("Sales Channel")["Estimated Count"].sum().reset_index()
+            sc_df = filtered_df.groupby("Sales Channel", observed=True)["Estimated Count"].sum().reset_index()
             fig_sc = px.pie(
                 sc_df,
                 values="Estimated Count",
@@ -430,7 +438,7 @@ if st.session_state["raw_df"] is not None:
 
     with col_pie2:
         if "Bound" in filtered_df.columns:
-            bound_df = filtered_df.groupby("Bound")["Estimated Count"].sum().reset_index()
+            bound_df = filtered_df.groupby("Bound", observed=True)["Estimated Count"].sum().reset_index()
             fig_bound = px.pie(
                 bound_df,
                 values="Estimated Count",
@@ -464,8 +472,8 @@ if st.session_state["raw_df"] is not None:
     other_cols = [c for c in filtered_df.columns if c not in new_cols]
     final_df = filtered_df[new_cols + other_cols]
 
-    st.dataframe(final_df.head(50), width="stretch")
-    st.caption("※ 안정적인 구동을 위해 미리보기는 상위 50건만 표출되며, 전체 데이터는 아래 엑셀 다운로드 버튼을 이용하세요.")
+    st.dataframe(final_df.head(30), width="stretch")
+    st.caption("※ 대시보드 속도 향상을 위해 미리보기는 상위 30건만 표출되며, 전체 데이터는 아래 엑셀 다운로드 버튼을 이용하세요.")
 
     st.subheader("📥 필터 및 추정 반영 데이터 엑셀 다운로드")
     output = io.BytesIO()
