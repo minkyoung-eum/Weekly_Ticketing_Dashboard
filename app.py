@@ -352,4 +352,4 @@ with tab2:
 with tab3:
     st.subheader("📋 Data Raw & Weight Match View")
     st.markdown("##### 가중치(Weight_num) 매칭 및 최종 Weighted_Value 적용 데이터")
-    st.dataframe(filtered_df[['노선', 'Dominant Marketing Airline', '발매주차', '출발 월', 'Bound', 'Ticket Type', '판매채널', 'Value', 'Weight_num', 'Weighted_Value']], use_container_width=True)
+    st.dataframe(filtered_df[['노선', 'Dominant Marketing Airline', '발매주차', '출발 월', 'Bound', 'Ticket Type', '판매채널', 'Value', 'Weight_num', 'Weighted_Value']], use_container_width=True))
