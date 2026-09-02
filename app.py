@@ -288,7 +288,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
         merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
 
-        route_order_list = merged_df.groupby('노선', observed=False)['Weighted_Value'].sum().sort_values(ascending=False).index.astype(str).tolist()
+        # 노선별 총 발매량 기준 엄격한 내림차순 정렬 (발매량 순 필터용)
+        route_order_series = merged_df.groupby('노선', observed=False)['Weighted_Value'].sum().sort_values(ascending=False)
+        route_order_list = [str(x) for x in route_order_series.index.tolist()]
+
+        week_col = '발매주차' if '발매주차' in merged_df.columns else ('Issue Week' if 'Issue Week' in merged_df.columns else ('Week' if 'Week' in merged_df.columns else None))
+        all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
+
         all_dep_months = sorted([str(x) for x in merged_df['출발 월'].dropna().unique()])
         all_bounds = sorted([str(x) for x in merged_df['Bound'].dropna().unique()])
         all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
@@ -312,6 +318,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 return full_list if ALL_OPTION in selected or not selected else selected
 
             selected_routes = get_form_selection("노선 (발매량 순)", route_order_list)
+            selected_weeks = get_form_selection("발매 주차", all_issue_weeks) if week_col else []
             default_ke = ["취항"] if "취항" in all_ke_services else [ALL_OPTION]
             selected_ke_services = get_form_selection("KE 취항 여부", all_ke_services, default_vals=default_ke) if ke_service_col else all_ke_services
             selected_dep_months = get_form_selection("출발 월", all_dep_months)
@@ -332,6 +339,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             (merged_df['판매채널'].astype(str).isin(selected_channels)) &
             (merged_df['Dominant Marketing Airline'].astype(str).isin(selected_airlines))
         )
+        if week_col:
+            filter_mask &= (merged_df[week_col].astype(str).isin(selected_weeks))
         if ke_service_col:
             filter_mask &= (merged_df[ke_service_col].astype(str).isin(selected_ke_services))
 
@@ -385,11 +394,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     route_iss_totals = bar_iss_grp.groupby('노선', observed=False)[val_col].transform('sum')
                     bar_iss_grp['MS_Percent'] = (bar_iss_grp[val_col] / route_iss_totals) * 100
 
+                    # 노선 내림차순 정렬 적용
+                    filtered_route_order = [r for r in route_order_list if r in bar_iss_grp['노선'].unique()]
+
                     fig2 = px.bar(
                         bar_iss_grp, x='노선', y='MS_Percent', color='Dominant Marketing Airline',
                         title='2. 노선별 항공사 발매 점유비 (M/S 막대그래프)',
                         barmode='stack', text='MS_Percent',
-                        category_orders={'Dominant Marketing Airline': al_order},
+                        category_orders={'Dominant Marketing Airline': al_order, '노선': filtered_route_order},
                         color_discrete_map=color_discrete_map
                     )
                     fig2.update_traces(
@@ -415,10 +427,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
             t1, t2 = st.columns([1.1, 1])
             with t1:
-                piv_w = filtered_df.pivot_table(index='Dominant Marketing Airline', columns='발매주차', values=val_col, aggfunc='sum', fill_value=0, observed=False)
-                piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
-                al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
-                st.dataframe(piv_w_ms.loc[al_sorted].map(lambda x: f"{x:.1f}%"), width="stretch")
+                if week_col and week_col in filtered_df.columns:
+                    piv_w = filtered_df.pivot_table(index='Dominant Marketing Airline', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
+                    piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
+                    al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
+                    st.dataframe(piv_w_ms.loc[al_sorted].map(lambda x: f"{x:.1f}%"), width="stretch")
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선', columns='Dominant Marketing Airline', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
@@ -548,7 +561,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         bar_sup_grp, x='노선', y='MS_Percent', color='Airline',
                         title='2. 노선별 항공사 공급 점유비 (M/S 막대그래프)',
                         barmode='stack', text='MS_Percent',
-                        category_orders={'Airline': sup_al_order},
+                        category_orders={'Airline': sup_al_order, '노선': sup_routes},
                         color_discrete_map=color_discrete_map
                     )
                     fig_s2.update_traces(
@@ -668,14 +681,12 @@ else:
     st.sidebar.header("🔍 6수송 대시보드 필터")
     
     with st.sidebar.form("filter_6th_form"):
-        # Filter TRIP MONTH specifically for 2026 / 26년
         def create_6th_month_multiselect(label, col_key):
             actual_c = actual_cols[col_key]
             if actual_c and actual_c in df_6.columns:
                 all_vals = sorted([str(x) for x in df_6[actual_c].dropna().unique()])
-                # Show only 2026/26년 months in the selection box
                 y26_vals = [m for m in all_vals if '2026' in m or '26년' in m or m.startswith('26.') or m.startswith('2026.')]
-                if not y26_vals: y26_vals = all_vals  # Fallback if format varies
+                if not y26_vals: y26_vals = all_vals
                 opts = [ALL_OPTION] + y26_vals
                 selected = st.multiselect(f"{label}", options=opts, default=[ALL_OPTION])
                 return y26_vals if ALL_OPTION in selected or not selected else selected
@@ -699,7 +710,6 @@ else:
                 return unique_vals if selected == ALL_OPTION else [selected]
             return []
 
-        # TRIP MONTH: Only 26년 displayed
         f_month = create_6th_month_multiselect("1. TRIP MONTH (26년 출발월)", 'TRIP MONTH')
         f_region = create_6th_multiselect("2. OD REGION", 'OD REGION')
         f_dir = create_6th_multiselect("3. DIRECTION", 'DIRECTION')
@@ -713,7 +723,6 @@ else:
 
         st.form_submit_button("🚀 6수송 필터 적용하기")
 
-    # Filter Logic: Apply selected 26년 months to current year, and map matching 25년 months to previous year
     month_c = actual_cols['TRIP MONTH']
     mask_6_base = pd.Series(True, index=df_6.index)
     
@@ -728,7 +737,6 @@ else:
         if act_c and filter_vals:
             mask_6_base &= (df_6[act_c].astype(str).isin(filter_vals))
 
-    # Identify 2025 corresponding months for YoY
     f_month_py = []
     for m in f_month:
         m_str = str(m)
@@ -747,25 +755,22 @@ else:
         mask_py = mask_6_base
 
     df_6_cy = df_6[mask_cy].copy()
-    df_6_py = df_6[mask_py].copy() if py_col_6 is None else df_6_cy.copy()
+    df_6_py = df_6[mask_py].copy() if not df_6[mask_py].empty else pd.DataFrame()
 
-    # Target Value Extraction
     val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else 'Flights')
+    py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
     
     if val_col_6 in df_6_cy.columns:
         df_6_cy['Val_num'] = pd.to_numeric(df_6_cy[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1)
     else:
         df_6_cy['Val_num'] = 1
 
-    py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
     if py_col_6 and py_col_6 in df_6_cy.columns:
         df_6_cy['Val_PY_num'] = pd.to_numeric(df_6_cy[py_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     else:
         if not df_6_py.empty and val_col_6 in df_6_py.columns:
             df_6_py['Val_PY_num'] = pd.to_numeric(df_6_py[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1)
-            # Combine current year & previous year dataset for YoY calculations
             al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Airline'
-            od_col_6 = actual_cols['OD ON/OFF'] if actual_cols['OD ON/OFF'] else '노선'
             
             py_agg_al = df_6_py.groupby(al_col_6, observed=False)['Val_PY_num'].sum().to_dict()
             df_6_cy['Val_PY_num'] = df_6_cy[al_col_6].map(py_agg_al).fillna(0)
