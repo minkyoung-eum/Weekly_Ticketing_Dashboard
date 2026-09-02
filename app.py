@@ -289,9 +289,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df = df_iss_raw.copy()
         df_wt = df_wt_raw.copy()
 
+        # 원본 노선 컬럼 문자열형 고정
+        df['노선'] = df['노선'].astype(str).str.strip()
+
         df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
         df_wt['Weight_num'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
         df_wt_subset = df_wt[['Route Code', 'Dominant Marketing Airline', 'Weight_num']].dropna(subset=['Route Code', 'Dominant Marketing Airline'])
+        df_wt_subset['Route Code'] = df_wt_subset['Route Code'].astype(str).str.strip()
 
         merged_df = pd.merge(
             df, df_wt_subset,
@@ -303,6 +307,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
         merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
 
+        # 조인 후의 가중치 반영 발매실적 기준 노선 정렬 (내림차순)
         full_route_sum = merged_df.groupby('노선', observed=False)['Weighted_Value'].sum().sort_values(ascending=False)
         route_order_list = [str(x) for x in full_route_sum.index.tolist()]
 
@@ -345,17 +350,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-        # 노선 필터링 연동 보완: Exact Match + Partial Substring Match
-        if len(selected_routes) == len(route_order_list):
-            route_mask = pd.Series(True, index=merged_df.index)
-        else:
-            # 선택한 노선 문자열들 중 어느 하나라도 포함되는지 매칭
-            route_patterns = [r.replace('/', r'\/') for r in selected_routes]
-            route_regex = "|".join(route_patterns)
-            route_mask = merged_df['노선'].astype(str).str.contains(route_regex, case=False, na=False)
-
+        # 노선 완전 일치(Exact Match) 필터링
         filter_mask = (
-            route_mask &
+            (merged_df['노선'].astype(str).isin(selected_routes)) &
             (merged_df['출발 월'].astype(str).isin(selected_dep_months)) &
             (merged_df['Bound'].astype(str).isin(selected_bounds)) &
             (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types)) &
@@ -381,6 +378,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             top_al = str(al_sum.idxmax())
             top_ms = (al_sum.max() / total_pax) * 100
 
+        # 최대 실적 노선: 필터 결과 중 최고 발매 실적 노선명 표출
         if not filtered_df.empty and total_pax > 0:
             filtered_route_sum = filtered_df.groupby('노선', observed=False)[val_col].sum()
             top_route = str(filtered_route_sum.idxmax())
