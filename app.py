@@ -43,7 +43,7 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# Custom CSS Styling (가독성 향상 고도화)
+# Custom CSS Styling
 st.markdown("""
 <style>
     [data-testid="stSidebar"] {
@@ -112,8 +112,18 @@ st.markdown("""
         background-color: #e0f2fe !important;
         border: 1px solid #7dd3fc !important;
     }
+    div[data-testid="stRadio"] > label {
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        margin-bottom: 8px !important;
+    }
+    div[data-testid="stRadio"] div[role="radiogroup"] label {
+        font-size: 15px !important;
+        font-weight: 600 !important;
+    }
 
-    /* O&D YoY Table Styling - 가독성 극대화 */
+    /* O&D YoY Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -335,8 +345,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
+        # 노선 필터링 연동 보완: Exact Match + Partial Substring Match
+        if len(selected_routes) == len(route_order_list):
+            route_mask = pd.Series(True, index=merged_df.index)
+        else:
+            # 선택한 노선 문자열들 중 어느 하나라도 포함되는지 매칭
+            route_patterns = [r.replace('/', r'\/') for r in selected_routes]
+            route_regex = "|".join(route_patterns)
+            route_mask = merged_df['노선'].astype(str).str.contains(route_regex, case=False, na=False)
+
         filter_mask = (
-            (merged_df['노선'].astype(str).isin(selected_routes)) &
+            route_mask &
             (merged_df['출발 월'].astype(str).isin(selected_dep_months)) &
             (merged_df['Bound'].astype(str).isin(selected_bounds)) &
             (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types)) &
@@ -731,7 +750,6 @@ else:
 
         st.form_submit_button("🚀 6수송 필터 적용하기")
 
-    # 수량 컬럼 파싱 (Value 컬럼 우선 집계)
     val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else 'Flights')
     py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
 
@@ -740,7 +758,6 @@ else:
     if py_col_6 and py_col_6 in df_6.columns:
         df_6['Val_PY_num'] = pd.to_numeric(df_6[py_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     else:
-        # PY 컬럼이 없더라도 수량 집계가 누락되지 않도록 안정화 처리
         df_6['Val_PY_num'] = df_6['Val_num'] * 0.95
 
     month_c = actual_cols['TRIP MONTH']
@@ -757,12 +774,11 @@ else:
         if act_c and filter_vals:
             mask_6_base &= (df_6[act_c].astype(str).isin(filter_vals))
 
-    # TRIP MONTH 필터링 적용 (해당 월 포함)
     if month_c and month_c in df_6.columns and f_month:
         mask_cy = mask_6_base & (df_6[month_c].astype(str).isin(f_month))
         filtered_6 = df_6[mask_cy].copy()
         if filtered_6.empty:
-            filtered_6 = df_6[mask_6_base].copy() # 월 매칭이 안될 경우 기본 필터 집계 보장
+            filtered_6 = df_6[mask_6_base].copy()
     else:
         filtered_6 = df_6[mask_6_base].copy()
 
@@ -797,7 +813,7 @@ else:
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP O&D 상세)", "📋 6수송 Raw Data View"])
 
     # ------------------------------------------
-    # TAB 1: 📊 O&D별 종합 M/S 분석 (가독성 향상 테이블)
+    # TAB 1: 📊 O&D별 종합 M/S 분석
     # ------------------------------------------
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
