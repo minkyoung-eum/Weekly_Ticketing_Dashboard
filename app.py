@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import datetime
 import os
 
 # Page Config
 st.set_page_config(
-    page_title="항공사 / 노선별 M/S 대시보드 (DDS)",
+    page_title="항공사 노선별 통합 M/S 대시보드 (발매 & 공급)",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -19,7 +18,6 @@ current_monday = today - datetime.timedelta(days=today.weekday())
 issue_start_date = current_monday - datetime.timedelta(weeks=5)
 issue_end_date = current_monday - datetime.timedelta(days=1)
 
-# Departure month range calculation (current month + 4 months)
 dep_start_m = today.replace(day=1)
 dep_months = []
 for i in range(5):
@@ -30,7 +28,7 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# Styling with KE Bright Skyblue Highlight (#00A1E9)
+# CSS Styling with KE Highlight (#00A1E9)
 st.markdown("""
 <style>
     .source-header-box {
@@ -84,12 +82,15 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 @st.cache_data
-def load_data():
+def load_all_data():
     ticketing_path = 'Ticketing-test_2.csv'
     weight_path = '가중치 파일.csv'
     
-    df_ticketing = None
-    df_weight = None
+    # Try loading new supply csv first, fallback to excel
+    supply_csv_path = '공급 (9월 1주).csv'
+    supply_excel_path = '공급.xlsx'
+    
+    df_ticketing, df_weight, df_supply = None, None, None
     
     if os.path.exists(ticketing_path):
         df_ticketing = pd.read_csv(ticketing_path, low_memory=False)
@@ -100,326 +101,331 @@ def load_data():
     if os.path.exists(weight_path):
         df_weight = pd.read_csv(weight_path)
         
-    return df_ticketing, df_weight
+    if os.path.exists(supply_csv_path):
+        df_supply = pd.read_csv(supply_csv_path, low_memory=False)
+    elif os.path.exists(supply_excel_path):
+        df_supply = pd.read_excel(supply_excel_path, sheet_name='공급_RAW')
+        
+    return df_ticketing, df_weight, df_supply
 
-df_raw, df_wt_raw = load_data()
+df_iss_raw, df_wt_raw, df_sup_raw = load_all_data()
 
-# Main Title & Dynamic Info Notice
-st.title("✈️ 항공사 / 노선별 M/S 대시보드")
-
+# Header Notice
+st.title("✈️ 항공사 노선별 M/S 대시보드")
 st.markdown(f"""
 <div class="source-header-box">
-    <b>📌 출처: DDS</b> &nbsp;|&nbsp; 
+    <b>📌 출처: DDS & OAG 공급 데이터</b> &nbsp;|&nbsp; 
     <b>🗓️ 발매일:</b> {issue_range_str} &nbsp;|&nbsp; 
     <b>✈️ 출발일:</b> {dep_range_str}
 </div>
 """, unsafe_allow_html=True)
 
-if df_raw is None or df_wt_raw is None:
-    col_u1, col_u2 = st.columns(2)
-    with col_u1:
-        u_file1 = st.file_uploader("Ticketing-test_2.csv 업로드", type=['csv'])
-        if u_file1:
-            df_raw = pd.read_csv(u_file1, low_memory=False)
-    with col_u2:
-        u_file2 = st.file_uploader("가중치 파일.csv 업로드", type=['csv'])
-        if u_file2:
-            df_wt_raw = pd.read_csv(u_file2)
-            
-    if df_raw is None or df_wt_raw is None:
-        st.info("두 가중치/티케팅 CSV 파일이 모두 필요합니다. 파일 위치를 확인해주세요.")
-        st.stop()
-
-# Data Preprocessing & Merging Weight
-df = df_raw.copy()
-df_wt = df_wt_raw.copy()
-
-# Parse Weight %
-df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
-df_wt['Weight_num'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
-
-df_wt_subset = df_wt[['Route Code', 'Dominant Marketing Airline', 'Weight_num']].dropna(subset=['Route Code', 'Dominant Marketing Airline'])
-
-# Merge Weight
-merged_df = pd.merge(
-    df,
-    df_wt_subset,
-    left_on=['노선', 'Dominant Marketing Airline'],
-    right_on=['Route Code', 'Dominant Marketing Airline'],
-    how='left'
+# Select Mode
+dashboard_mode = st.radio(
+    "📊 대시보드 분석 모드 선택:",
+    options=["🎟️ 발매 M/S 대시보드", "✈️ 공급 M/S 대시보드"],
+    horizontal=True
 )
 
-merged_df['Weight_num'] = merged_df['Weight_num'].fillna(1.0)
-merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
-merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
-
-# Filter Lists Preparation
 ALL_OPTION = "전체 (All)"
 
-route_order_list = merged_df.groupby('노선')['Weighted_Value'].sum().sort_values(ascending=False).index.tolist()
-all_dep_months = sorted([str(x) for x in merged_df['출발 월'].dropna().unique()])
-all_bounds = sorted([str(x) for x in merged_df['Bound'].dropna().unique()])
-all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
-all_channels = sorted([str(x) for x in merged_df['판매채널'].dropna().unique()])
+# ==========================================
+# MODE 1: 발매 M/S 대시보드
+# ==========================================
+if dashboard_mode == "🎟️ 발매 M/S 대시보드":
+    if df_iss_raw is None or df_wt_raw is None:
+        st.warning("발매 데이터(Ticketing-test_2.csv) 또는 가중치 파일(가중치 파일.csv)이 필요합니다.")
+        st.stop()
 
-raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
-if 'KE' in raw_airlines:
-    raw_airlines.remove('KE')
-    all_airlines = ['KE'] + raw_airlines
+    df = df_iss_raw.copy()
+    df_wt = df_wt_raw.copy()
+
+    df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
+    df_wt['Weight_num'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
+    df_wt_subset = df_wt[['Route Code', 'Dominant Marketing Airline', 'Weight_num']].dropna(subset=['Route Code', 'Dominant Marketing Airline'])
+
+    merged_df = pd.merge(
+        df, df_wt_subset,
+        left_on=['노선', 'Dominant Marketing Airline'],
+        right_on=['Route Code', 'Dominant Marketing Airline'],
+        how='left'
+    )
+    merged_df['Weight_num'] = merged_df['Weight_num'].fillna(1.0)
+    merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
+    merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
+
+    route_order_list = merged_df.groupby('노선')['Weighted_Value'].sum().sort_values(ascending=False).index.tolist()
+    all_dep_months = sorted([str(x) for x in merged_df['출발 월'].dropna().unique()])
+    all_bounds = sorted([str(x) for x in merged_df['Bound'].dropna().unique()])
+    all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
+    all_channels = sorted([str(x) for x in merged_df['판매채널'].dropna().unique()])
+
+    raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
+    all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
+
+    st.sidebar.header("🔍 발매 대시보드 필터")
+    with st.sidebar.form("iss_filter_form"):
+        apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
+        
+        def get_form_selection(label, full_list):
+            options = [ALL_OPTION] + full_list
+            selected = st.multiselect(label, options=options, default=[ALL_OPTION])
+            return full_list if ALL_OPTION in selected or not selected else selected
+
+        selected_routes = get_form_selection("노선 (발매량 순)", route_order_list)
+        selected_dep_months = get_form_selection("출발 월", all_dep_months)
+        selected_bounds = get_form_selection("Bound", all_bounds)
+        selected_ticket_types = get_form_selection("Ticket Type (여정)", all_ticket_types)
+        selected_channels = get_form_selection("판매채널", all_channels)
+        selected_airlines = get_form_selection("항공사 (KE 최우선)", all_airlines)
+
+        st.form_submit_button("🚀 필터 적용하기", type="primary", use_container_width=True)
+
+    val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
+
+    filtered_df = merged_df[
+        (merged_df['노선'].astype(str).isin(selected_routes)) &
+        (merged_df['출발 월'].astype(str).isin(selected_dep_months)) &
+        (merged_df['Bound'].astype(str).isin(selected_bounds)) &
+        (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types)) &
+        (merged_df['판매채널'].astype(str).isin(selected_channels)) &
+        (merged_df['Dominant Marketing Airline'].astype(str).isin(selected_airlines))
+    ]
+
+    color_discrete_map = {'KE': '#00A1E9'}
+
+    # KPI Row
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    total_pax = filtered_df[val_col].sum()
+    ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
+    ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
+
+    top_al = "-"
+    top_ms = 0.0
+    if not filtered_df.empty and total_pax > 0:
+        al_sum = filtered_df.groupby('Dominant Marketing Airline')[val_col].sum()
+        top_al = al_sum.idxmax()
+        top_ms = (al_sum.max() / total_pax) * 100
+
+    top_route = filtered_df.groupby('노선')[val_col].sum().idxmax() if not filtered_df.empty else "-"
+    status_wt_label = " (가중치 적용)" if apply_weight_toggle else " (순수 Raw)"
+
+    with col_m1:
+        st.markdown(f'<div class="metric-card"><div class="metric-title">총 발매 실적{status_wt_label}</div><div class="metric-value">{total_pax:,.0f}</div></div>', unsafe_allow_html=True)
+    with col_m2:
+        st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#0284c7; font-weight:bold;">✈️ KE (대한항공) M/S</div><div class="metric-value" style="color:#0284c7;">{ke_pax:,.0f} ({ke_ms:.1f}%)</div></div>', unsafe_allow_html=True)
+    with col_m3:
+        st.markdown(f'<div class="metric-card"><div class="metric-title">1위 항공사 (M/S)</div><div class="metric-value" style="color:#1d4ed8;"><b>{top_al}</b> ({top_ms:.1f}%)</div></div>', unsafe_allow_html=True)
+    with col_m4:
+        st.markdown(f'<div class="metric-card"><div class="metric-title">최대 실적 노선</div><div class="metric-value" style="color:#047857;">{top_route}</div></div>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "📋 Raw Data View"])
+    with tab1:
+        st.subheader(f"📊 발매 M/S 시각화 분석{status_wt_label}")
+        if not filtered_df.empty:
+            al_order = [al for al in all_airlines if al in filtered_df['Dominant Marketing Airline'].unique()]
+            c1, c2 = st.columns(2)
+            with c1:
+                pie_al = filtered_df.groupby('Dominant Marketing Airline')[val_col].sum().reset_index()
+                fig1 = px.pie(pie_al, values=val_col, names='Dominant Marketing Airline', title='1. 항공사별 M/S 점유비 (KE 하늘색 강조)', hole=0.4, category_orders={'Dominant Marketing Airline': al_order}, color='Dominant Marketing Airline', color_discrete_map=color_discrete_map)
+                fig1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                st.plotly_chart(fig1, use_container_width=True)
+            with c2:
+                df_w = filtered_df.groupby(['발매주차', 'Dominant Marketing Airline'])[val_col].sum().reset_index()
+                fig2 = px.bar(df_w, x='발매주차', y=val_col, color='Dominant Marketing Airline', title='2. 주차별 항공사 실적 추이', barmode='stack', category_orders={'Dominant Marketing Airline': al_order}, color_discrete_map=color_discrete_map, text=val_col)
+                fig2.update_traces(texttemplate='%{text:,.0f}', textposition='inside', hovertemplate="<b>주차: %{x}</b><br>항공사: %{fullData.name}<br>실적: %{y:,.0f}<extra></extra>")
+                st.plotly_chart(fig2, use_container_width=True)
+            st.markdown("---")
+            c3, c4, c5 = st.columns(3)
+            with c3:
+                fig3 = px.pie(filtered_df.groupby('Bound')[val_col].sum().reset_index(), values=val_col, names='Bound', title='3. BOUND별 점유비', hole=0.4)
+                st.plotly_chart(fig3, use_container_width=True)
+            with c4:
+                fig4 = px.pie(filtered_df.groupby('Ticket Type')[val_col].sum().reset_index(), values=val_col, names='Ticket Type', title='4. TRIP TYPE별 점유비', hole=0.4)
+                st.plotly_chart(fig4, use_container_width=True)
+            with c5:
+                fig5 = px.pie(filtered_df.groupby('판매채널')[val_col].sum().reset_index(), values=val_col, names='판매채널', title='5. 판매 채널별 점유비', hole=0.4)
+                st.plotly_chart(fig5, use_container_width=True)
+
+    with tab2:
+        st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
+        t1, t2 = st.columns([1.1, 1])
+        with t1:
+            piv_w = filtered_df.pivot_table(index='Dominant Marketing Airline', columns='발매주차', values=val_col, aggfunc='sum', fill_value=0)
+            piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
+            al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
+            st.dataframe(piv_w_ms.loc[al_sorted].applymap(lambda x: f"{x:.1f}%"), use_container_width=True)
+        with t2:
+            piv_r = filtered_df.pivot_table(index='노선', columns='Dominant Marketing Airline', values=val_col, aggfunc='sum', fill_value=0)
+            cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
+            piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
+            st.dataframe(piv_r_ms.applymap(lambda x: f"{x:.1f}%"), use_container_width=True)
+
+    with tab3:
+        st.dataframe(filtered_df, use_container_width=True)
+
+# ==========================================
+# MODE 2: 공급 M/S 대시보드
+# ==========================================
 else:
-    all_airlines = raw_airlines
+    if df_sup_raw is None:
+        st.warning("공급 데이터(공급 (9월 1주).csv) 파일이 필요합니다.")
+        st.stop()
 
-# Sidebar Filter Form with [Apply Button]
-st.sidebar.header("🔍 대시보드 필터 (Slicers)")
-
-with st.sidebar.form("filter_form"):
-    apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
+    df_sup = df_sup_raw.copy()
     
-    def get_form_selection(label, full_list):
-        options = [ALL_OPTION] + full_list
-        selected = st.multiselect(label, options=options, default=[ALL_OPTION])
-        if ALL_OPTION in selected or not selected:
-            return full_list
-        return selected
-
-    selected_routes = get_form_selection("노선 (발매량 순)", route_order_list)
-    selected_dep_months = get_form_selection("출발 월", all_dep_months)
-    selected_bounds = get_form_selection("Bound", all_bounds)
-    selected_ticket_types = get_form_selection("Ticket Type (여정)", all_ticket_types)
-    selected_channels = get_form_selection("판매채널", all_channels)
-    selected_airlines = get_form_selection("항공사 (KE 최우선)", all_airlines)
-
-    # Submit Button
-    submitted = st.form_submit_button("🚀 필터 적용하기", type="primary", use_container_width=True)
-
-val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
-
-# Filter Dataset
-filtered_df = merged_df[
-    (merged_df['노선'].astype(str).isin(selected_routes)) &
-    (merged_df['출발 월'].astype(str).isin(selected_dep_months)) &
-    (merged_df['Bound'].astype(str).isin(selected_bounds)) &
-    (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types)) &
-    (merged_df['판매채널'].astype(str).isin(selected_channels)) &
-    (merged_df['Dominant Marketing Airline'].astype(str).isin(selected_airlines))
-]
-
-# Ensure KE is Highlighted with Bright Sky Blue (#00A1E9)
-color_discrete_map = {'KE': '#00A1E9'} 
-
-# KPI Top Summary
-col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-
-total_pax = filtered_df[val_col].sum()
-
-top_al = "-"
-top_ms = 0.0
-if not filtered_df.empty and total_pax > 0:
-    al_sum = filtered_df.groupby('Dominant Marketing Airline')[val_col].sum()
-    top_al = al_sum.idxmax()
-    top_ms = (al_sum.max() / total_pax) * 100
-
-ke_pax = filtered_df[filtered_df['Dominant Marketing Airline'] == 'KE'][val_col].sum() if not filtered_df.empty else 0
-ke_ms = (ke_pax / total_pax * 100) if total_pax > 0 else 0
-
-top_route = "-"
-if not filtered_df.empty:
-    route_sum = filtered_df.groupby('노선')[val_col].sum()
-    if not route_sum.empty:
-        top_route = route_sum.idxmax()
-
-status_wt_label = " (가중치 적용)" if apply_weight_toggle else " (순수 Raw)"
-
-with col_m1:
-    st.markdown(f'<div class="metric-card"><div class="metric-title">총 발매 실적{status_wt_label}</div><div class="metric-value">{total_pax:,.0f}</div></div>', unsafe_allow_html=True)
-with col_m2:
-    st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#0284c7; font-weight:bold;">✈️ KE (대한항공) M/S</div><div class="metric-value" style="color:#0284c7;">{ke_pax:,.0f} ({ke_ms:.1f}%)</div></div>', unsafe_allow_html=True)
-with col_m3:
-    st.markdown(f'<div class="metric-card"><div class="metric-title">1위 항공사 (M/S)</div><div class="metric-value" style="color:#1d4ed8;"><b>{top_al}</b> ({top_ms:.1f}%)</div></div>', unsafe_allow_html=True)
-with col_m4:
-    st.markdown(f'<div class="metric-card"><div class="metric-title">최대 실적 노선</div><div class="metric-value" style="color:#047857;">{top_route}</div></div>', unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Main Content
-tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "📋 Raw Data & Weight Match View"])
-
-with tab1:
-    st.subheader(f"📊 M/S 분석 시각화 대시보드{status_wt_label}")
+    # Clean Column Names & Numeric Values
+    df_sup.columns = [c.strip() for c in df_sup.columns]
     
-    if not filtered_df.empty:
-        al_order = [al for al in all_airlines if al in filtered_df['Dominant Marketing Airline'].unique()]
-        
-        col_r1_1, col_r1_2 = st.columns(2)
-        
-        with col_r1_1:
-            pie_al = filtered_df.groupby('Dominant Marketing Airline')[val_col].sum().reset_index()
-            fig_pie_al = px.pie(
-                pie_al, 
-                values=val_col, 
-                names='Dominant Marketing Airline', 
-                title='1. 항공사별 M/S 점유비 (KE 하늘색 강조)', 
-                hole=0.4,
-                category_orders={'Dominant Marketing Airline': al_order},
-                color='Dominant Marketing Airline',
-                color_discrete_map=color_discrete_map
-            )
-            fig_pie_al.update_traces(
-                textposition='inside',
-                textinfo='percent+label',
-                hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>"
-            )
-            st.plotly_chart(fig_pie_al, use_container_width=True)
-            
-        with col_r1_2:
-            df_chart_week = filtered_df.groupby(['발매주차', 'Dominant Marketing Airline'])[val_col].sum().reset_index()
-            fig_week = px.bar(
-                df_chart_week,
-                x='발매주차',
-                y=val_col,
-                color='Dominant Marketing Airline',
-                title='2. 주차별 항공사 실적 추이 (수치 표시 & KE 강조)',
-                barmode='stack',
-                category_orders={'Dominant Marketing Airline': al_order},
-                color_discrete_map=color_discrete_map,
-                text=val_col
-            )
-            fig_week.update_traces(
-                texttemplate='%{text:,.0f}',
-                textposition='inside',
-                hovertemplate="<b>주차: %{x}</b><br>항공사: %{fullData.name}<br>실적: %{y:,.0f}<extra></extra>"
-            )
-            fig_week.update_layout(xaxis_title="발매주차", yaxis_title="실적 (Pax)")
-            st.plotly_chart(fig_week, use_container_width=True)
-
-        st.markdown("---")
-        
-        col_r2_1, col_r2_2, col_r2_3 = st.columns(3)
-        
-        with col_r2_1:
-            pie_bound = filtered_df.groupby('Bound')[val_col].sum().reset_index()
-            fig_bound = px.pie(
-                pie_bound, 
-                values=val_col, 
-                names='Bound', 
-                title='3. BOUND별 점유비', 
-                hole=0.4,
-                color_discrete_sequence=px.colors.qualitative.Pastel
-            )
-            fig_bound.update_traces(
-                textposition='inside',
-                textinfo='percent+label',
-                hovertemplate="<b>Bound: %{label}</b><br>실적: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>"
-            )
-            st.plotly_chart(fig_bound, use_container_width=True)
-
-        with col_r2_2:
-            pie_tt = filtered_df.groupby('Ticket Type')[val_col].sum().reset_index()
-            fig_tt = px.pie(
-                pie_tt, 
-                values=val_col, 
-                names='Ticket Type', 
-                title='4. TRIP TYPE (여정)별 점유비', 
-                hole=0.4,
-                color_discrete_sequence=px.colors.qualitative.Set3
-            )
-            fig_tt.update_traces(
-                textposition='inside',
-                textinfo='percent+label',
-                hovertemplate="<b>Ticket Type: %{label}</b><br>실적: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>"
-            )
-            st.plotly_chart(fig_tt, use_container_width=True)
-
-        with col_r2_3:
-            pie_channel = filtered_df.groupby('판매채널')[val_col].sum().reset_index()
-            fig_channel = px.pie(
-                pie_channel, 
-                values=val_col, 
-                names='판매채널', 
-                title='5. 판매 채널별 점유비', 
-                hole=0.4,
-                color_discrete_sequence=px.colors.qualitative.Safe
-            )
-            fig_channel.update_traces(
-                textposition='inside',
-                textinfo='percent+label',
-                hovertemplate="<b>판매채널: %{label}</b><br>실적: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>"
-            )
-            st.plotly_chart(fig_channel, use_container_width=True)
-
+    # Airline Column Normalize
+    if 'Op Airline Code' in df_sup.columns:
+        df_sup['Airline'] = df_sup['Op Airline Code']
+    elif 'Mkt Al' in df_sup.columns:
+        df_sup['Airline'] = df_sup['Mkt Al']
     else:
-        st.info("선택된 필터 조건에 해당하는 데이터가 없습니다.")
+        df_sup['Airline'] = 'Unknown'
 
-with tab2:
-    col_t1, col_t2 = st.columns([1.1, 1])
+    # Clean Seats & Flights
+    if 'Seats' in df_sup.columns:
+        df_sup['Seats_num'] = pd.to_numeric(df_sup['Seats'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    else:
+        df_sup['Seats_num'] = 0
+
+    if 'Flights' in df_sup.columns:
+        df_sup['Flights_num'] = pd.to_numeric(df_sup['Flights'].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
+    else:
+        df_sup['Flights_num'] = 1
+
+    # Filter Options
+    sup_routes = df_sup.groupby('노선')['Seats_num'].sum().sort_values(ascending=False).index.tolist()
+    sup_months = sorted([str(x) for x in df_sup['출발 월'].dropna().unique()]) if '출발 월' in df_sup.columns else []
+    sup_time_cats = sorted([str(x) for x in df_sup['출발 시간대'].dropna().unique()]) if '출발 시간대' in df_sup.columns else []
+    sup_ke_status = sorted([str(x) for x in df_sup['KE취항여부'].dropna().unique()]) if 'KE취항여부' in df_sup.columns else []
     
-    with col_t1:
-        st.markdown(f'<div class="section-header">📌 주차별 항공사 M/S 매트릭스 (KE 최우선 정렬){status_wt_label}</div>', unsafe_allow_html=True)
-        if not filtered_df.empty:
-            piv_week = filtered_df.pivot_table(
-                index='Dominant Marketing Airline',
-                columns='발매주차',
-                values=val_col,
-                aggfunc='sum',
-                fill_value=0
-            )
-            
-            week_order = ['7월 4주차', '7월 5주차', '8월 1주차', '8월 2주차', '8월 3주차', '8월 4주차']
-            existing_weeks = [w for w in week_order if w in piv_week.columns] + [w for w in piv_week.columns if w not in week_order]
-            piv_week = piv_week[existing_weeks]
-            
-            week_totals = piv_week.sum(axis=0)
-            piv_week_ms = piv_week.divide(week_totals, axis=1) * 100
-            
-            total_by_al = filtered_df.groupby('Dominant Marketing Airline')[val_col].sum()
-            piv_week_ms['총합계'] = (total_by_al / total_pax * 100) if total_pax > 0 else 0
-            
-            al_sorted_ke = [al for al in ['KE'] + sorted([x for x in piv_week_ms.index if x != 'KE']) if al in piv_week_ms.index]
-            piv_week_ms = piv_week_ms.loc[al_sorted_ke]
-            
-            formatted_week_ms = piv_week_ms.applymap(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%")
-            st.dataframe(formatted_week_ms, use_container_width=True, height=450)
-        else:
-            st.info("선택된 필터 조건에 해당하는 데이터가 없습니다.")
+    raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
+    sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
 
-    with col_t2:
-        st.markdown(f'<div class="section-header">📌 노선별 항공사 M/S 매트릭스 (KE 최우선 컬럼){status_wt_label}</div>', unsafe_allow_html=True)
-        if not filtered_df.empty:
-            piv_route = filtered_df.pivot_table(
-                index='노선',
-                columns='Dominant Marketing Airline',
-                values=val_col,
-                aggfunc='sum',
-                fill_value=0
-            )
-            
-            cols_ke_first = [al for al in ['KE'] + sorted([x for x in piv_route.columns if x != 'KE']) if al in piv_route.columns]
-            piv_route = piv_route[cols_ke_first]
-            
-            route_pax_sums = filtered_df.groupby('노선')[val_col].sum().sort_values(ascending=False)
-            sorted_routes = [r for r in route_pax_sums.index if r in piv_route.index]
-            piv_route = piv_route.loc[sorted_routes]
-            
-            route_totals = piv_route.sum(axis=1)
-            piv_route_ms = piv_route.divide(route_totals, axis=0) * 100
-            
-            combined_rows = []
-            for r in piv_route.index:
-                val_row = piv_route.loc[r].apply(lambda x: f"{x:,.0f}")
-                ms_row = piv_route_ms.loc[r].apply(lambda x: f"{x:.1f}%")
-                
-                val_row.name = (r, '실적')
-                ms_row.name = (r, 'M/S')
-                
-                combined_rows.append(val_row)
-                combined_rows.append(ms_row)
-                
-            df_route_display = pd.DataFrame(combined_rows)
-            st.dataframe(df_route_display, use_container_width=True, height=450)
-        else:
-            st.info("선택된 필터 조건에 해당하는 데이터가 없습니다.")
+    st.sidebar.header("🔍 공급 대시보드 필터")
+    with st.sidebar.form("sup_filter_form"):
+        metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
+        
+        def get_sup_selection(label, full_list):
+            options = [ALL_OPTION] + full_list
+            selected = st.multiselect(label, options=options, default=[ALL_OPTION])
+            return full_list if ALL_OPTION in selected or not selected else selected
 
-with tab3:
-    st.subheader("📋 Data Raw & Weight Match View")
-    st.markdown("##### 가중치(Weight_num) 매칭 및 최종 Weighted_Value 적용 데이터")
-    st.dataframe(filtered_df[['노선', 'Dominant Marketing Airline', '발매주차', '출발 월', 'Bound', 'Ticket Type', '판매채널', 'Value', 'Weight_num', 'Weighted_Value']], use_container_width=True)
+        selected_sup_routes = get_sup_selection("노선 (공급석 순)", sup_routes)
+        selected_sup_months = get_sup_selection("출발 월", sup_months)
+        selected_sup_times = get_sup_selection("출발 시간대", sup_time_cats)
+        selected_sup_ke_status = get_sup_selection("KE 취항여부", sup_ke_status)
+        selected_sup_airlines = get_sup_selection("항공사 (KE 최우선)", sup_airlines)
+
+        st.form_submit_button("🚀 공급 필터 적용하기", type="primary", use_container_width=True)
+
+    target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
+
+    # Filtering Logic
+    filter_mask = (
+        (df_sup['노선'].astype(str).isin(selected_sup_routes)) &
+        (df_sup['Airline'].astype(str).isin(selected_sup_airlines))
+    )
+    if '출발 월' in df_sup.columns:
+        filter_mask &= (df_sup['출발 월'].astype(str).isin(selected_sup_months))
+    if '출발 시간대' in df_sup.columns:
+        filter_mask &= (df_sup['출발 시간대'].astype(str).isin(selected_sup_times))
+    if 'KE취항여부' in df_sup.columns:
+        filter_mask &= (df_sup['KE취항여부'].astype(str).isin(selected_sup_ke_status))
+
+    filtered_sup = df_sup[filter_mask]
+
+    color_discrete_map = {'KE': '#00A1E9'}
+
+    # Top KPI Cards
+    col_s1, col_s2, col_s3, col_s4 = st.columns(4)
+    total_seats = filtered_sup['Seats_num'].sum()
+    total_flights = filtered_sup['Flights_num'].sum()
+    
+    ke_sup_val = filtered_sup[filtered_sup['Airline'] == 'KE'][target_val].sum() if not filtered_sup.empty else 0
+    total_sup_val = filtered_sup[target_val].sum()
+    ke_sup_ms = (ke_sup_val / total_sup_val * 100) if total_sup_val > 0 else 0
+
+    top_sup_al = filtered_sup.groupby('Airline')[target_val].sum().idxmax() if not filtered_sup.empty else "-"
+
+    with col_s1:
+        st.markdown(f'<div class="metric-card"><div class="metric-title">총 공급 좌석수 (Seats)</div><div class="metric-value">{total_seats:,.0f}석</div></div>', unsafe_allow_html=True)
+    with col_s2:
+        st.markdown(f'<div class="metric-card"><div class="metric-title">총 운항 편수 (Flights)</div><div class="metric-value">{total_flights:,.0f}회</div></div>', unsafe_allow_html=True)
+    with col_s3:
+        st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#0284c7; font-weight:bold;">✈️ KE 공급 M/S ({metric_mode.split()[0]})</div><div class="metric-value" style="color:#0284c7;">{ke_sup_val:,.0f} ({ke_sup_ms:.1f}%)</div></div>', unsafe_allow_html=True)
+    with col_s4:
+        st.markdown(f'<div class="metric-card"><div class="metric-title">공급 M/S 1위 항공사</div><div class="metric-value" style="color:#1d4ed8;"><b>{top_sup_al}</b></div></div>', unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    tab_s1, tab_s2, tab_s3 = st.tabs(["📈 공급 시각화 분석 차트", "📊 공급 M/S 피벗 테이블", "📋 공급 Raw View"])
+
+    with tab_s1:
+        st.subheader(f"📊 항공사 / 노선별 공급 M/S 분석 ({metric_mode})")
+        if not filtered_sup.empty:
+            sup_al_order = [al for al in sup_airlines if al in filtered_sup['Airline'].unique()]
+            
+            cs1, cs2 = st.columns(2)
+            with cs1:
+                pie_sup_al = filtered_sup.groupby('Airline')[target_val].sum().reset_index()
+                fig_s1 = px.pie(
+                    pie_sup_al, values=target_val, names='Airline',
+                    title='1. 항공사별 공급 M/S 점유비 (KE 하늘색 강조)', hole=0.4,
+                    category_orders={'Airline': sup_al_order},
+                    color='Airline', color_discrete_map=color_discrete_map
+                )
+                fig_s1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                st.plotly_chart(fig_s1, use_container_width=True)
+
+            with cs2:
+                bar_sup_route = filtered_sup.groupby(['노선', 'Airline'])[target_val].sum().reset_index()
+                fig_s2 = px.bar(
+                    bar_sup_route, x='노선', y=target_val, color='Airline',
+                    title='2. 노선별 항공사 공급량 비교', barmode='stack',
+                    category_orders={'Airline': sup_al_order},
+                    color_discrete_map=color_discrete_map, text=target_val
+                )
+                fig_s2.update_traces(texttemplate='%{text:,.0f}', textposition='inside', hovertemplate="<b>노선: %{x}</b><br>항공사: %{fullData.name}<br>공급: %{y:,.0f}<extra></extra>")
+                st.plotly_chart(fig_s2, use_container_width=True)
+
+            st.markdown("---")
+            cs3, cs4, cs5 = st.columns(3)
+            with cs3:
+                if '출발 시간대' in filtered_sup.columns:
+                    fig_s3 = px.pie(filtered_sup.groupby('출발 시간대')[target_val].sum().reset_index(), values=target_val, names='출발 시간대', title='3. 출발 시간대별 공급 비중', hole=0.4)
+                    st.plotly_chart(fig_s3, use_container_width=True)
+            with cs4:
+                if 'KE취항여부' in filtered_sup.columns:
+                    fig_s4 = px.pie(filtered_sup.groupby('KE취항여부')[target_val].sum().reset_index(), values=target_val, names='KE취항여부', title='4. KE 취항여부별 공급 비중', hole=0.4)
+                    st.plotly_chart(fig_s4, use_container_width=True)
+            with cs5:
+                if '출발 월' in filtered_sup.columns:
+                    fig_s5 = px.pie(filtered_sup.groupby('출발 월')[target_val].sum().reset_index(), values=target_val, names='출발 월', title='5. 출발 월별 공급 분포', hole=0.4)
+                    st.plotly_chart(fig_s5, use_container_width=True)
+
+    with tab_s2:
+        st.markdown(f"##### 📌 노선 및 출발월별 공급 M/S 매트릭스 ({metric_mode})")
+        ts1, ts2 = st.columns([1.1, 1])
+        with ts1:
+            piv_s_route = filtered_sup.pivot_table(index='노선', columns='Airline', values=target_val, aggfunc='sum', fill_value=0)
+            cols_sup_ke = ['KE'] + [x for x in piv_s_route.columns if x != 'KE'] if 'KE' in piv_s_route.columns else piv_s_route.columns
+            piv_s_route = piv_s_route[cols_sup_ke]
+            
+            piv_s_route_ms = piv_s_route.divide(piv_s_route.sum(axis=1), axis=0) * 100
+            st.dataframe(piv_s_route_ms.applymap(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), use_container_width=True)
+
+        with ts2:
+            if '출발 월' in filtered_sup.columns:
+                piv_s_month = filtered_sup.pivot_table(index='Airline', columns='출발 월', values=target_val, aggfunc='sum', fill_value=0)
+                piv_s_month_ms = piv_s_month.divide(piv_s_month.sum(axis=0), axis=1) * 100
+                al_sup_ke = ['KE'] + [x for x in piv_s_month_ms.index if x != 'KE'] if 'KE' in piv_s_month_ms.index else piv_s_month_ms.index
+                st.dataframe(piv_s_month_ms.loc[al_sup_ke].applymap(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), use_container_width=True)
+
+    with tab_s3:
+        st.dataframe(filtered_sup, use_container_width=True)
