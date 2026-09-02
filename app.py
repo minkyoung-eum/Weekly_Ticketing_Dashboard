@@ -23,7 +23,8 @@ def get_iso_month_week(date):
     try:
         dt = pd.to_datetime(date)
         iso_year, iso_week, iso_day = dt.isocalendar()
-        thursday = dt + pd.Timedelta(days=4 - iso_day)
+        days_diff = int(4 - iso_day)
+        thursday = dt + pd.Timedelta(days=days_diff)
         month = thursday.month
         week_of_month = (thursday.day - 1) // 7 + 1
         return f"{month}월 {week_of_month}주차"
@@ -340,7 +341,7 @@ if st.session_state["raw_df"] is not None:
     # 🎯 항공사별 발매 점유비 분석 (가중치 적용 추정치 기준)
     # ---------------------------------------------------------
     st.subheader("🎯 항공사별 발매 점유비 (가중치 추정 반영)")
-    st.caption("📌 출처 : DDS, 발매기간 : 26.7/27~8/30 (최근 5주), 출발기간 : 26년 9월~27년 2월 (향후 6개월)")
+    st.caption("📌 출처 : DDS, 발매기간 : 최근 5주, 출발기간 : 향후 6개월")
 
     if airline_col not in df.columns:
         st.error(f"⚠️ 파일에 `{airline_col}` 컬럼이 존재하지 않습니다. 컬럼명을 확인해주세요.")
@@ -394,18 +395,18 @@ if st.session_state["raw_df"] is not None:
                     height=480,
                     showlegend=False,
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
                 tab1, tab2, tab3 = st.tabs(["📊 추정 점유율 (%) 표", "🔢 추정 발권 건수 표", "📋 RAW 실적 건수 표"])
                 with tab1:
                     st.subheader(table_title_pct)
-                    st.dataframe(pivot_pct_full.applymap(lambda x: f"{x:.1f}%"), use_container_width=True)
+                    st.dataframe(pivot_pct_full.map(lambda x: f"{x:.1f}%"), width="stretch")
                 with tab2:
                     st.subheader(table_title_cnt)
-                    st.dataframe(pivot_est_full.applymap(lambda x: f"{x:,.1f}"), use_container_width=True)
+                    st.dataframe(pivot_est_full.map(lambda x: f"{x:,.1f}"), width="stretch")
                 with tab3:
                     st.subheader("RAW 실적 건수 (가중치 미반영)")
-                    st.dataframe(pivot_raw_full, use_container_width=True)
+                    st.dataframe(pivot_raw_full, width="stretch")
 
         else:
             chart_title = f"선택한 Route Code별 항공사 추정 점유율 (%)"
@@ -435,15 +436,15 @@ if st.session_state["raw_df"] is not None:
                 )
                 fig.update_traces(texttemplate="%{text}%", textposition="inside")
                 fig.update_layout(yaxis=dict(title="추정 점유율 (%)", range=[0, 100]), xaxis_title="", height=500)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
                 tab1, tab2 = st.tabs(["📊 추정 점유율 (%) 표", "🔢 추정 발권 건수 표"])
                 with tab1:
                     st.subheader(table_title_pct)
-                    st.dataframe(pivot_pct.applymap(lambda x: f"{x:.1f}%"), use_container_width=True)
+                    st.dataframe(pivot_pct.map(lambda x: f"{x:.1f}%"), width="stretch")
                 with tab2:
                     st.subheader(table_title_cnt)
-                    st.dataframe(pivot_est.applymap(lambda x: f"{x:,.1f}"), use_container_width=True)
+                    st.dataframe(pivot_est.map(lambda x: f"{x:,.1f}"), width="stretch")
 
     st.divider()
 
@@ -466,7 +467,7 @@ if st.session_state["raw_df"] is not None:
     other_cols = [c for c in filtered_df.columns if c not in new_cols]
     final_df = filtered_df[new_cols + other_cols]
 
-    st.dataframe(final_df, use_container_width=True)
+    st.dataframe(final_df, width="stretch")
 
     st.subheader("📥 필터 및 추정 반영 데이터 엑셀 다운로드")
     output = io.BytesIO()
