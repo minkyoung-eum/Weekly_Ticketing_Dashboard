@@ -298,7 +298,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df['노선'] = df['노선'].astype(str).str.strip()
 
         # -------------------------------------------------------------
-        # 항공사별 수식 기반 가중치 추정 로직 (IFERROR + AVERAGEIF)
+        # 항공사별 가중치 추정 및 1.0 최대치 제한(Max 1.0 Clip) 로직
         # -------------------------------------------------------------
         df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
         df_wt['Weight_num'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
@@ -310,10 +310,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_wt_subset['Route Code'] = df_wt_subset[wt_col_route].astype(str).str.strip()
         df_wt_subset['Dominant Marketing Airline'] = df_wt_subset[wt_col_al].astype(str).str.strip()
 
-        # 노선별 평균 가중치 산출 (AVERAGEIF 연산)
+        # 노선별 평균 가중치 산출 (AVERAGEIF)
         route_avg_weights = df_wt_subset.groupby('Route Code', observed=False)['Weight_num'].mean().to_dict()
 
-        # 1차 VLOOKUP 매칭 (항공사+노선)
+        # 1차 VLOOKUP 매칭
         merged_df = pd.merge(
             df, df_wt_subset[['Route Code', 'Dominant Marketing Airline', 'Weight_num']],
             left_on=['노선', 'Dominant Marketing Airline'],
@@ -321,25 +321,23 @@ if selected_group == "✈️ 3/4수송 대시보드":
             how='left'
         )
 
-        # 2차 Fallback: 누락된 데이터는 노선 평균 가중치(AVERAGEIF)로 보정
+        # 2차 Fallback & 가중치 최대치(1.0) 제어 적용
         merged_df['Weight_num'] = merged_df['Weight_num'].fillna(merged_df['노선'].map(route_avg_weights)).fillna(1.0)
         
+        # 📌 핵심: 가중치가 1.0을 넘지 않도록 최대 1.0으로 수정 적용
+        merged_df['Weight_num'] = np.minimum(merged_df['Weight_num'], 1.0)
+
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
 
         # -------------------------------------------------------------
-        # 항공사별 정규화 가중치 연산 (SUMPRODUCT 분모 처리)
-        # SUMPRODUCT(Value_i * Weight_i)
+        # 항공사별 가중 M/S 정규화 재배분 (SUMPRODUCT)
         # -------------------------------------------------------------
         merged_df['Raw_Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
         
-        # 노선별 SUMPRODUCT 분모 계산
         route_sumproduct = merged_df.groupby('노선', observed=False)['Raw_Weighted_Value'].transform('sum')
         route_raw_sum = merged_df.groupby('노선', observed=False)['Value'].transform('sum')
 
-        # 가중 비중 분율 = (Value * Weight) / SUMPRODUCT(Value * Weight)
         merged_df['Weighted_Ratio'] = np.where(route_sumproduct > 0, merged_df['Raw_Weighted_Value'] / route_sumproduct, 0)
-        
-        # 가중 실적 = 노선 전체 Raw 발매량 * 가중 비중 분율
         merged_df['Weighted_Value'] = merged_df['Weighted_Ratio'] * route_raw_sum
 
         week_col = '발매 주차' if '발매 주차' in merged_df.columns else ('발매주차' if '발매주차' in merged_df.columns else ('Issue Week' if 'Issue Week' in merged_df.columns else None))
@@ -362,16 +360,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # -------------------------------------------------------------
-        # 가중치 스위치 바깥 배치 (실시간 사이드바 필터 정렬 동기화)
-        # -------------------------------------------------------------
+        # 가중치 스위치 바깥 배치
         st.sidebar.markdown("---")
         st.sidebar.header("🔍 발매 대시보드 필터")
         apply_weight_toggle = st.sidebar.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
 
         val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-        # 스위치 상태에 맞춰 노선 내림차순 정렬
+        # 정렬 동기화
         full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
         route_order_list = [str(x) for x in full_route_sum.index.tolist()]
 
@@ -419,7 +415,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             top_al = str(al_sum.idxmax())
             top_ms = (al_sum.max() / total_pax) * 100
 
-        # 선택된 필터 결과 내 동일 기준 1위 노선
         if not filtered_df.empty and total_pax > 0:
             filtered_route_sum = filtered_df.groupby('노선', observed=False)[val_col].sum()
             top_route = str(filtered_route_sum.idxmax())
