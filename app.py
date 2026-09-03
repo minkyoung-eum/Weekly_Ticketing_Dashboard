@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="항공사 노선별 통합 M/S 분석 대시보드 (3/4수송 & 6수송)",
     page_icon="✈️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Dynamic Date Logic
@@ -34,15 +34,12 @@ issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.st
 # Custom CSS Styling
 st.markdown("""
 <style>
-    [data-testid="stSidebar"] {
-        background-color: #f1f5f9 !important;
-    }
     .source-header-box {
         background-color: #f0f9ff;
         border-left: 5px solid #0284c7;
         padding: 12px 18px;
         border-radius: 6px;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
         font-size: 14px;
         color: #0f172a;
         font-weight: 500;
@@ -90,12 +87,14 @@ st.markdown("""
         padding: 2px 6px;
         border-radius: 4px;
     }
+    /* 상단 필터 영역 카능 및 강조 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 2px solid #0ea5e9 !important;
         border-radius: 12px !important;
         padding: 18px !important;
         box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.1);
+        margin-bottom: 20px !important;
     }
     span[data-baseweb="tag"], [data-baseweb="tag"] {
         background-color: #0ea5e9 !important;
@@ -259,7 +258,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 상단 대시보드 구조 재편
+# 상단 대시보드 구조 재편 (3/4수송 vs 6수송)
 # -------------------------------------------------------------
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 selected_group = st.radio(
@@ -379,33 +378,36 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        st.sidebar.markdown("---")
-        st.sidebar.header("🔍 발매 대시보드 필터")
-        apply_weight_toggle = st.sidebar.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
+        # 📌 요청반영: 3/4수송 발매 필터 상단 이관 (Expander 카드 레이아웃)
+        with st.expander("🔍 **발매 대시보드 검색 & 필터 설정** (클릭하여 여닫기)", expanded=True):
+            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
+            val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-        val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
+            full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
+            route_order_list = [str(x) for x in full_route_sum.index.tolist()]
 
-        full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
-        route_order_list = [str(x) for x in full_route_sum.index.tolist()]
+            with st.form("iss_filter_form_top"):
+                f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+                
+                def get_form_selection(col_obj, label, full_list, default_vals=None):
+                    options = [ALL_OPTION] + full_list
+                    default_choice = default_vals if default_vals is not None else [ALL_OPTION]
+                    selected = col_obj.multiselect(label, options=options, default=default_choice)
+                    return full_list if ALL_OPTION in selected or not selected else selected
 
-        with st.sidebar.form("iss_filter_form"):
-            def get_form_selection(label, full_list, default_vals=None):
-                options = [ALL_OPTION] + full_list
-                default_choice = default_vals if default_vals is not None else [ALL_OPTION]
-                selected = st.multiselect(label, options=options, default=default_choice)
-                return full_list if ALL_OPTION in selected or not selected else selected
+                selected_routes = get_form_selection(f_col1, "1. 노선 (발매량 순)", route_order_list)
+                selected_weeks = get_form_selection(f_col2, "2. 발매 주차", all_issue_weeks) if week_col else []
+                default_ke = ["취항"] if "취항" in all_ke_services else [ALL_OPTION]
+                selected_ke_services = get_form_selection(f_col3, "3. KE 취항 여부", all_ke_services, default_vals=default_ke) if ke_service_col else all_ke_services
+                selected_dep_months = get_form_selection(f_col4, "4. 출발 월", all_dep_months) if month_col else []
 
-            selected_routes = get_form_selection("노선 (발매량 순)", route_order_list)
-            selected_weeks = get_form_selection("발매 주차", all_issue_weeks) if week_col else []
-            default_ke = ["취항"] if "취항" in all_ke_services else [ALL_OPTION]
-            selected_ke_services = get_form_selection("KE 취항 여부", all_ke_services, default_vals=default_ke) if ke_service_col else all_ke_services
-            selected_dep_months = get_form_selection("출발 월", all_dep_months) if month_col else []
-            selected_bounds = get_form_selection("Bound", all_bounds) if bound_col else []
-            selected_ticket_types = get_form_selection("Ticket Type (여정)", all_ticket_types)
-            selected_channels = get_form_selection("판매채널", all_channels) if channel_col else []
-            selected_airlines = get_form_selection("항공사 (KE 최우선)", all_airlines)
+                f_col5, f_col6, f_col7, f_col8 = st.columns(4)
+                selected_bounds = get_form_selection(f_col5, "5. Bound", all_bounds) if bound_col else []
+                selected_ticket_types = get_form_selection(f_col6, "6. Ticket Type (여정)", all_ticket_types)
+                selected_channels = get_form_selection(f_col7, "7. 판매채널", all_channels) if channel_col else []
+                selected_airlines = get_form_selection(f_col8, "8. 항공사 (KE 최우선)", all_airlines)
 
-            st.form_submit_button("🚀 발매 필터 적용하기")
+                st.form_submit_button("🚀 발매 필터 적용하기")
 
         filter_mask = (
             (merged_df['노선'].astype(str).isin(selected_routes)) &
@@ -676,25 +678,29 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
 
-        st.sidebar.markdown("---")
-        st.sidebar.header("🔍 공급 대시보드 필터")
-        with st.sidebar.form("sup_filter_form"):
-            metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
-            
-            def get_sup_selection(label, full_list, default_vals=None):
-                options = [ALL_OPTION] + full_list
-                default_choice = default_vals if default_vals is not None else [ALL_OPTION]
-                selected = st.multiselect(label, options=options, default=default_choice)
-                return full_list if ALL_OPTION in selected or not selected else selected
+        # 📌 요청반영: 3/4수송 공급 필터 상단 이관 (Expander 카드 레이아웃)
+        with st.expander("🔍 **공급 대시보드 검색 & 필터 설정** (클릭하여 여닫기)", expanded=True):
+            with st.form("sup_filter_form_top"):
+                metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
+                
+                sf_col1, sf_col2, sf_col3 = st.columns(3)
+                
+                def get_sup_selection(col_obj, label, full_list, default_vals=None):
+                    options = [ALL_OPTION] + full_list
+                    default_choice = default_vals if default_vals is not None else [ALL_OPTION]
+                    selected = col_obj.multiselect(label, options=options, default=default_choice)
+                    return full_list if ALL_OPTION in selected or not selected else selected
 
-            selected_sup_routes = get_sup_selection("노선 (공급석 순)", sup_routes)
-            default_sup_ke = ["취항"] if "취항" in sup_ke_services else [ALL_OPTION]
-            selected_sup_ke_services = get_sup_selection("KE 취항 여부", sup_ke_services, default_vals=default_sup_ke) if sup_ke_col else sup_ke_services
-            selected_sup_months = get_sup_selection("출발 월", sup_months) if sup_month_col else []
-            selected_sup_times = get_sup_selection("출발 시간대", sup_time_cats)
-            selected_sup_airlines = get_sup_selection("항공사 (KE 최우선)", sup_airlines)
+                selected_sup_routes = get_sup_selection(sf_col1, "1. 노선 (공급석 순)", sup_routes)
+                default_sup_ke = ["취항"] if "취항" in sup_ke_services else [ALL_OPTION]
+                selected_sup_ke_services = get_sup_selection(sf_col2, "2. KE 취항 여부", sup_ke_services, default_vals=default_sup_ke) if sup_ke_col else sup_ke_services
+                selected_sup_months = get_sup_selection(sf_col3, "3. 출발 월", sup_months) if sup_month_col else []
 
-            st.form_submit_button("🚀 공급 필터 적용하기")
+                sf_col4, sf_col5, _ = st.columns([1, 1, 1])
+                selected_sup_times = get_sup_selection(sf_col4, "4. 출발 시간대", sup_time_cats)
+                selected_sup_airlines = get_sup_selection(sf_col5, "5. 항공사 (KE 최우선)", sup_airlines)
+
+                st.form_submit_button("🚀 공급 필터 적용하기")
 
         target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
 
@@ -813,7 +819,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             is_all_selected = (set(selected_sup_routes) == set(sup_routes)) or (ALL_OPTION in selected_sup_routes)
             
             if is_all_selected:
-                st.info("💡 **좌측 필터에서 특정 노선을 선택하시면 해당 노선의 항공사별 운항 스케줄 타임라인이 표출됩니다.**")
+                st.info("💡 **상단 필터에서 특정 노선을 선택하시면 해당 노선의 항공사별 운항 스케줄 타임라인이 표출됩니다.**")
             else:
                 target_routes_for_timeline = [r for r in selected_sup_routes if r != ALL_OPTION]
                 if target_routes_for_timeline:
@@ -899,39 +905,43 @@ else:
     else:
         sorted_6th_airlines = []
 
-    st.sidebar.markdown("---")
-    st.sidebar.header("🔍 6수송 대시보드 필터")
-    
-    with st.sidebar.form("filter_6th_form"):
-        def create_6th_multiselect(label, col_key):
-            actual_c = actual_cols[col_key]
-            if actual_c and actual_c in df_6.columns:
-                unique_vals = sorted([str(x) for x in df_6[actual_c].dropna().unique()])
-                opts = [ALL_OPTION] + unique_vals
-                selected = st.multiselect(f"{label}", options=opts, default=[ALL_OPTION])
-                return unique_vals if ALL_OPTION in selected or not selected else selected
-            return []
+    # 📌 요청반영: 6수송 10대 필터 상단 이관 (멀티셀렉트 + 기본 모든값 선택)
+    with st.expander("🔍 **6수송 대시보드 검색 & 필터 설정** (클릭하여 여닫기)", expanded=True):
+        with st.form("filter_6th_form_top"):
+            c6_f1, c6_f2, c6_f3, c6_f4 = st.columns(4)
+            
+            def create_6th_multiselect(col_obj, label, col_key):
+                actual_c = actual_cols[col_key]
+                if actual_c and actual_c in df_6.columns:
+                    unique_vals = sorted([str(x) for x in df_6[actual_c].dropna().unique()])
+                    opts = [ALL_OPTION] + unique_vals
+                    selected = col_obj.multiselect(f"{label}", options=opts, default=[ALL_OPTION])
+                    return unique_vals if ALL_OPTION in selected or not selected else selected
+                return []
 
-        def create_6th_selectbox_al(label):
-            if sorted_6th_airlines:
-                opts = [ALL_OPTION] + sorted_6th_airlines
-                selected = st.selectbox(f"{label}", options=opts, index=0)
-                return sorted_6th_airlines if selected == ALL_OPTION else [selected]
-            return []
+            def create_6th_multiselect_al(col_obj, label):
+                if sorted_6th_airlines:
+                    opts = [ALL_OPTION] + sorted_6th_airlines
+                    selected = col_obj.multiselect(f"{label}", options=opts, default=[ALL_OPTION])
+                    return sorted_6th_airlines if ALL_OPTION in selected or not selected else selected
+                return []
 
-        f_month = create_6th_multiselect("1. TRIP MONTH", 'TRIP MONTH')
-        f_dir = create_6th_multiselect("2. DIRECTION", 'DIRECTION')
-        f_stop = create_6th_multiselect("3. STOP OVER", 'STOP OVER')
-        f_region = create_6th_multiselect("4. OD REGION", 'OD REGION')
-        f_od = create_6th_multiselect("5. O&D On/Off", 'OD ON/OFF')
-        f_al = create_6th_selectbox_al("6. 항공사 (KE 최우선)")
-        
-        f_ori_cntry = create_6th_multiselect("7. TRIP ORIGIN COUNTRY", 'TRIP ORIGIN COUNTRY')
-        f_jp_apo = create_6th_multiselect("8. 일본 APO", '일본 APO')
-        f_dst_cntry = create_6th_multiselect("9. TRIP DSTN COUNTRY", 'TRIP DSTN COUNTRY')
-        f_ov_apo = create_6th_multiselect("10. 해외 APO", '해외 APO')
+            f_month = create_6th_multiselect(c6_f1, "1. TRIP MONTH", 'TRIP MONTH')
+            f_dir = create_6th_multiselect(c6_f2, "2. DIRECTION", 'DIRECTION')
+            f_stop = create_6th_multiselect(c6_f3, "3. STOP OVER", 'STOP OVER')
+            f_region = create_6th_multiselect(c6_f4, "4. OD REGION", 'OD REGION')
 
-        st.form_submit_button("🚀 6수송 필터 적용하기")
+            c6_f5, c6_f6, c6_f7, c6_f8 = st.columns(4)
+            f_od = create_6th_multiselect(c6_f5, "5. O&D On/Off", 'OD ON/OFF')
+            f_al = create_6th_multiselect_al(c6_f6, "6. 항공사 (KE 최우선)")
+            f_ori_cntry = create_6th_multiselect(c6_f7, "7. TRIP ORIGIN COUNTRY", 'TRIP ORIGIN COUNTRY')
+            f_jp_apo = create_6th_multiselect(c6_f8, "8. 일본 APO", '일본 APO')
+
+            c6_f9, c6_f10, _, _ = st.columns(4)
+            f_dst_cntry = create_6th_multiselect(c6_f9, "9. TRIP DSTN COUNTRY", 'TRIP DSTN COUNTRY')
+            f_ov_apo = create_6th_multiselect(c6_f10, "10. 해외 APO", '해외 APO')
+
+            st.form_submit_button("🚀 6수송 필터 적용하기")
 
     mask_6_base = pd.Series(True, index=df_6.index)
     
