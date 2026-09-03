@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 붉은색 완전 제거 및 파란색/하늘색(#0ea5e9) 버튼 강력 오버라이드 CSS
+# 📌 CSS 스타일 (테두리 및 그림자 제거, 파란색 버튼 가운데 정렬)
 st.markdown("""
 <style>
     :root {
@@ -130,15 +130,17 @@ st.markdown("""
         border-radius: 4px;
     }
 
+    /* 필터 박스 깔끔한 외곽선 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
-        border: 2px solid #0ea5e9 !important;
+        border: 1px solid #e2e8f0 !important;
         border-radius: 12px !important;
         padding: 20px !important;
-        box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.1);
+        box-shadow: none !important;
         margin-bottom: 20px !important;
     }
     
+    /* 📌 필터 적용하기 버튼: 가운데 정렬, 테두리/그림자 제거한 파란색 버튼 */
     div[data-testid="stForm"] div.stButton {
         display: flex !important;
         justify-content: center !important;
@@ -153,22 +155,21 @@ st.markdown("""
         margin: 15px auto 0 auto !important;
         background-color: #0ea5e9 !important;
         color: #ffffff !important;
-        font-weight: 800 !important;
-        font-size: 16px !important;
-        padding: 12px 48px !important;
-        border-radius: 8px !important;
+        font-weight: 700 !important;
+        font-size: 15px !important;
+        padding: 10px 40px !important;
+        border-radius: 6px !important;
         border: none !important;
-        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4) !important;
-        transition: all 0.2s ease-in-out !important;
+        box-shadow: none !important;
+        outline: none !important;
         cursor: pointer !important;
     }
     
     div[data-testid="stForm"] button:hover {
         background-color: #0284c7 !important;
-        transform: scale(1.03) !important;
-        box-shadow: 0 6px 16px rgba(2, 132, 199, 0.5) !important;
     }
 
+    /* Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -257,7 +258,7 @@ uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['
 uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
-@st.cache_data(max_entries=3, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
         return None
@@ -277,7 +278,7 @@ def load_smart_file(uploaded_file):
         return pd.read_excel(uploaded_file)
     return None
 
-@st.cache_data(max_entries=3, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
     if os.path.exists('34수송_9월1주차_CSV_2.csv'):
@@ -311,7 +312,8 @@ df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
 
-@st.cache_data(max_entries=3, ttl=3600)
+# 📌 OH NO 메모리 초과 방지 캐싱 전처리 함수
+@st.cache_data(max_entries=2, ttl=3600)
 def process_iss_merged(df_iss, df_wt):
     if df_iss is None or df_wt is None:
         return None
@@ -1142,7 +1144,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 )
                 mask_grp &= (~is_grp_cond)
 
-        # 📌 OOM 예방 .copy() 연산
+        # 📌 OOM 크래시 방지 .copy() 연산
         df_grp_filtered = df_grp_raw[mask_grp].copy()
 
         if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns and 'Date_Obj' in df_grp_filtered.columns:
