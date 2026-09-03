@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# CSS Styling (스카이블루 #0ea5e9 고정)
+# 📌 붉은색 완전 제거 및 파란색/하늘색(#0ea5e9) 버튼 강력 오버라이드 CSS
 st.markdown("""
 <style>
     :root {
@@ -59,7 +59,7 @@ st.markdown("""
         background-color: #0ea5e9 !important;
         border-color: #0ea5e9 !important;
     }
-    
+
     button[data-baseweb="tab"][aria-selected="true"] {
         color: #0ea5e9 !important;
         border-bottom-color: #0ea5e9 !important;
@@ -69,6 +69,7 @@ st.markdown("""
         background-color: #0ea5e9 !important;
     }
 
+    /* Header 및 메트릭 박스 */
     .source-header-box {
         background-color: #f0f9ff;
         border-left: 5px solid #0284c7;
@@ -123,35 +124,48 @@ st.markdown("""
         border-radius: 4px;
     }
 
+    /* 필터 박스 프레임 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 2px solid #0ea5e9 !important;
         border-radius: 12px !important;
-        padding: 18px !important;
+        padding: 20px !important;
         box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.1);
         margin-bottom: 20px !important;
     }
     
+    /* 📌 필터 적용하기 버튼: 중앙 정렬 & 눈에 잘 띄는 파란색 선명한 배경 */
+    div[data-testid="stForm"] div.stButton {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        width: 100% !important;
+    }
+    
     div[data-testid="stForm"] button[kind="primaryFormSubmit"], 
-    div[data-testid="stForm"] button[type="submit"] {
+    div[data-testid="stForm"] button[type="submit"],
+    div[data-testid="stForm"] button {
         display: block !important;
         margin: 15px auto 0 auto !important;
         background-color: #0ea5e9 !important;
         color: #ffffff !important;
         font-weight: 800 !important;
         font-size: 16px !important;
-        padding: 10px 32px !important;
+        padding: 12px 48px !important;
         border-radius: 8px !important;
         border: none !important;
-        box-shadow: 0 4px 10px rgba(14, 165, 233, 0.3) !important;
+        box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4) !important;
         transition: all 0.2s ease-in-out !important;
+        cursor: pointer !important;
     }
-    div[data-testid="stForm"] button[kind="primaryFormSubmit"]:hover, 
-    div[data-testid="stForm"] button[type="submit"]:hover {
+    
+    div[data-testid="stForm"] button:hover {
         background-color: #0284c7 !important;
-        transform: scale(1.02) !important;
+        transform: scale(1.03) !important;
+        box-shadow: 0 6px 16px rgba(2, 132, 199, 0.5) !important;
     }
 
+    /* Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -240,7 +254,7 @@ uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['
 uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
-@st.cache_data(max_entries=5, ttl=3600)
+@st.cache_data(max_entries=3, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
         return None
@@ -260,7 +274,7 @@ def load_smart_file(uploaded_file):
         return pd.read_excel(uploaded_file)
     return None
 
-@st.cache_data(max_entries=5, ttl=3600)
+@st.cache_data(max_entries=3, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
     if os.path.exists('34수송_9월1주차_CSV_2.csv'):
@@ -293,6 +307,64 @@ df_iss_raw = load_smart_file(uploaded_iss) if uploaded_iss else disk_iss
 df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
+
+# 📌 메모리 초과 방지 캐싱 전처리 로직
+@st.cache_data(max_entries=3, ttl=3600)
+def process_iss_merged(df_iss, df_wt):
+    if df_iss is None or df_wt is None:
+        return None
+    df = df_iss.copy()
+    df_wt_c = df_wt.copy()
+
+    df['노선'] = df['노선'].astype(str).str.strip()
+
+    date_sub_col = '발매일자 ' if '발매일자 ' in df.columns else ('발매일자' if '발매일자' in df.columns else None)
+    week_col_raw = '발매 주차' if '발매 주차' in df.columns else ('발매주차' if '발매주차' in df.columns else None)
+
+    if week_col_raw and date_sub_col and date_sub_col in df.columns:
+        df['발매주차_일자'] = df[week_col_raw].astype(str) + " " + df[date_sub_col].astype(str)
+
+    df_wt_c['Weight_clean'] = df_wt_c['Weight'].astype(str).str.replace('%', '').str.strip()
+    df_wt_c['Weight_ratio'] = pd.to_numeric(df_wt_c['Weight_clean'], errors='coerce') / 100.0
+    
+    wt_col_route = 'Route Code' if 'Route Code' in df_wt_c.columns else ('노선' if '노선' in df_wt_c.columns else df_wt_c.columns[0])
+    wt_col_al = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in df_wt_c.columns else ('항공사' if '항공사' in df_wt_c.columns else df_wt_c.columns[1])
+
+    df_wt_subset = df_wt_c[[wt_col_route, wt_col_al, 'Weight_ratio']].dropna(subset=[wt_col_route, wt_col_al])
+    df_wt_subset['Route Code'] = df_wt_subset[wt_col_route].astype(str).str.strip()
+    df_wt_subset['Dominant Marketing Airline'] = df_wt_subset[wt_col_al].astype(str).str.strip()
+
+    route_avg_ratios = df_wt_subset.groupby('Route Code', observed=False)['Weight_ratio'].mean().to_dict()
+
+    merged_df = pd.merge(
+        df, df_wt_subset[['Route Code', 'Dominant Marketing Airline', 'Weight_ratio']],
+        left_on=['노선', 'Dominant Marketing Airline'],
+        right_on=['Route Code', 'Dominant Marketing Airline'],
+        how='left'
+    )
+
+    merged_df['Weight_ratio'] = pd.to_numeric(merged_df['Weight_ratio'].fillna(merged_df['노선'].map(route_avg_ratios)).fillna(1.0), errors='coerce').fillna(1.0)
+    
+    def convert_to_reciprocal_weight(ratio):
+        try:
+            r_val = float(ratio)
+            if pd.isna(r_val) or r_val <= 0 or r_val >= 1.0:
+                return 1.0
+            return 1.0 / r_val
+        except:
+            return 1.0
+
+    merged_df['Weight_num'] = merged_df['Weight_ratio'].apply(convert_to_reciprocal_weight)
+    merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
+
+    merged_df['Raw_Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
+    route_sumproduct = merged_df.groupby('노선', observed=False)['Raw_Weighted_Value'].transform('sum')
+    route_raw_sum = merged_df.groupby('노선', observed=False)['Value'].transform('sum')
+
+    merged_df['Weighted_Ratio'] = np.where(route_sumproduct > 0, merged_df['Raw_Weighted_Value'] / route_sumproduct, 0)
+    merged_df['Weighted_Value'] = merged_df['Weighted_Ratio'] * route_raw_sum
+
+    return merged_df
 
 # Header Notice
 st.title("✈️ 항공사 노선별 통합 M/S 분석 대시보드")
@@ -363,60 +435,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV_2.csv]와 [가중치 파일.csv]를 업로드해주세요.")
             st.stop()
 
-        df = df_iss_raw.copy()
-        df_wt = df_wt_raw.copy()
+        merged_df = process_iss_merged(df_iss_raw, df_wt_raw)
 
-        df['노선'] = df['노선'].astype(str).str.strip()
-
-        # 발매 주차와 발매일자 함께 결합 표출
-        date_sub_col = '발매일자 ' if '발매일자 ' in df.columns else ('발매일자' if '발매일자' in df.columns else None)
-        week_col_raw = '발매 주차' if '발매 주차' in df.columns else ('발매주차' if '발매주차' in df.columns else None)
-
-        if week_col_raw and date_sub_col and date_sub_col in df.columns:
-            df['발매주차_일자'] = df[week_col_raw].astype(str) + " " + df[date_sub_col].astype(str)
-            week_col = '발매주차_일자'
-        else:
-            week_col = week_col_raw
-
-        df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
-        df_wt['Weight_ratio'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
-        
-        wt_col_route = 'Route Code' if 'Route Code' in df_wt.columns else ('노선' if '노선' in df_wt.columns else df_wt.columns[0])
-        wt_col_al = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in df_wt.columns else ('항공사' if '항공사' in df_wt.columns else df_wt.columns[1])
-
-        df_wt_subset = df_wt[[wt_col_route, wt_col_al, 'Weight_ratio']].dropna(subset=[wt_col_route, wt_col_al])
-        df_wt_subset['Route Code'] = df_wt_subset[wt_col_route].astype(str).str.strip()
-        df_wt_subset['Dominant Marketing Airline'] = df_wt_subset[wt_col_al].astype(str).str.strip()
-
-        route_avg_ratios = df_wt_subset.groupby('Route Code', observed=False)['Weight_ratio'].mean().to_dict()
-
-        merged_df = pd.merge(
-            df, df_wt_subset[['Route Code', 'Dominant Marketing Airline', 'Weight_ratio']],
-            left_on=['노선', 'Dominant Marketing Airline'],
-            right_on=['Route Code', 'Dominant Marketing Airline'],
-            how='left'
-        )
-
-        merged_df['Weight_ratio'] = pd.to_numeric(merged_df['Weight_ratio'].fillna(merged_df['노선'].map(route_avg_ratios)).fillna(1.0), errors='coerce').fillna(1.0)
-        
-        def convert_to_reciprocal_weight(ratio):
-            try:
-                r_val = float(ratio)
-                if pd.isna(r_val) or r_val <= 0 or r_val >= 1.0:
-                    return 1.0
-                return 1.0 / r_val
-            except:
-                return 1.0
-
-        merged_df['Weight_num'] = merged_df['Weight_ratio'].apply(convert_to_reciprocal_weight)
-        merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
-
-        merged_df['Raw_Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
-        route_sumproduct = merged_df.groupby('노선', observed=False)['Raw_Weighted_Value'].transform('sum')
-        route_raw_sum = merged_df.groupby('노선', observed=False)['Value'].transform('sum')
-
-        merged_df['Weighted_Ratio'] = np.where(route_sumproduct > 0, merged_df['Raw_Weighted_Value'] / route_sumproduct, 0)
-        merged_df['Weighted_Value'] = merged_df['Weighted_Ratio'] * route_raw_sum
+        week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
 
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
 
@@ -437,7 +458,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 전체 노선 목록 (발매량 높은 순)
         full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
         route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
@@ -456,7 +476,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 selected_routes = create_dropdown(f_col1, "1. 노선 (발매량 순 정렬)", route_order_list)
                 selected_weeks = create_dropdown(f_col2, "2. 발매 주차 및 일자", all_issue_weeks) if week_col else []
                 
-                # 📌 KE 취항 여부 드롭다운 (기본값: '취항' 선택, 전체 선택 시 0)
                 default_ke_idx = (all_ke_services.index("취항") + 1) if "취항" in all_ke_services else 0
                 selected_ke_val = f_col3.selectbox("3. KE 취항 여부 (기본: 취항)", options=[ALL_OPTION] + all_ke_services, index=default_ke_idx) if ke_service_col else ALL_OPTION
                 selected_ke_services = all_ke_services if selected_ke_val == ALL_OPTION else [selected_ke_val]
@@ -924,25 +943,16 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (RBD Hierarchy 정렬)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (RBD Hierarchy 정렬 적용)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
             st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV_2.csv] 파일이 업로드되어 있는지 확인해주세요.")
             st.stop()
 
-        df_agency = df_iss_raw.copy()
-        df_agency['Value'] = pd.to_numeric(df_agency['Value'], errors='coerce').fillna(0)
-        df_agency['노선'] = df_agency['노선'].astype(str).str.strip()
+        df_agency = process_iss_merged(df_iss_raw, df_wt_raw)
 
-        date_sub_col_a = '발매일자 ' if '발매일자 ' in df_agency.columns else ('발매일자' if '발매일자' in df_agency.columns else None)
-        week_col_raw_a = '발매 주차' if '발매 주차' in df_agency.columns else ('발매주차' if '발매주차' in df_agency.columns else None)
-
-        if week_col_raw_a and date_sub_col_a and date_sub_col_a in df_agency.columns:
-            df_agency['발매주차_일자'] = df_agency[week_col_raw_a].astype(str) + " " + df_agency[date_sub_col_a].astype(str)
-            week_col_a = '발매주차_일자'
-        else:
-            week_col_a = week_col_raw_a
+        week_col_a = '발매주차_일자' if '발매주차_일자' in df_agency.columns else ('발매 주차' if '발매 주차' in df_agency.columns else '발매주차')
 
         month_col_a = '출발월' if '출발월' in df_agency.columns else ('출발 월' if '출발 월' in df_agency.columns else None)
         bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
@@ -1077,12 +1087,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV_2.csv] 파일이 업로드되어 있는지 확인해주세요.")
             st.stop()
 
-        df_grp_raw = df_iss_raw.copy()
-        df_grp_raw['Value'] = pd.to_numeric(df_grp_raw['Value'], errors='coerce').fillna(0)
-        df_grp_raw['노선'] = df_grp_raw['노선'].astype(str).str.strip()
+        df_grp_raw = process_iss_merged(df_iss_raw, df_wt_raw)
 
         df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw['Ticket Purchase Date'], errors='coerce')
-        valid_dates = df_grp_raw['Date_Obj'].dropna().sort_values().unique()
 
         with st.expander("🔍 **단체실적 검색 & 드롭다운 필터 설정** (이미지 필터 연동)", expanded=True):
             with st.form("group_performance_filter_form"):
@@ -1133,7 +1140,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 )
                 mask_grp &= (~is_grp_cond)
 
-        df_grp_filtered = df_grp_raw[mask_grp].copy()
+        df_grp_filtered = df_grp_raw[mask_grp]
 
         if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns and 'Date_Obj' in df_grp_filtered.columns:
             df_grp_filtered['Date_Str'] = df_grp_filtered['Date_Obj'].dt.strftime('%m/%d')
