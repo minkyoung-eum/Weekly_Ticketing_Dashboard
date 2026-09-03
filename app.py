@@ -463,7 +463,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                     filtered_route_order = [r for r in route_order_list if r in bar_iss_grp['노선'].astype(str).unique()]
 
-                    # 2. 노선별 항공사 발매 점유비 (M/S 막대그래프 삭제 반영)
                     fig2 = px.bar(
                         bar_iss_grp, x='노선', y='MS_Percent', color='Dominant Marketing Airline',
                         title='2. 노선별 항공사 발매 점유비',
@@ -480,7 +479,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 신규 추가: 3. 발매 주차별 항공사별 발매량 차트
+                # 📌 3. 발매 주차별 항공사별 발매량 (누적 그래프: barmode='stack' 연동)
                 if week_col and week_col in filtered_df.columns:
                     st.subheader("📅 주차별 발매 실적 추이")
                     week_al_grp = filtered_df.groupby([week_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
@@ -488,12 +487,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     fig_week = px.bar(
                         week_al_grp, x=week_col, y=val_col, color='Dominant Marketing Airline',
                         title='3. 발매 주차별 항공사별 발매량',
-                        barmode='group', text=val_col,
+                        barmode='stack', text=val_col,
                         category_orders={'Dominant Marketing Airline': al_order, week_col: all_issue_weeks},
                         color_discrete_map=color_discrete_map
                     )
                     fig_week.update_traces(
-                        texttemplate='%{text:,.0f}', textposition='outside',
+                        texttemplate='%{text:,.0f}', textposition='inside',
                         hovertemplate="<b>발매주차: %{x}</b><br>항공사: %{fullData.name}<br>발매량: %{y:,.0f}<extra></extra>"
                     )
                     fig_week.update_layout(yaxis_title=f"발매 실적{' (가중치)' if apply_weight_toggle else ''}")
@@ -736,7 +735,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     piv_s_month = filtered_sup.pivot_table(index='Airline', columns=sup_month_col, values=target_val, aggfunc='sum', fill_value=0, observed=False)
                     piv_s_month_ms = piv_s_month.divide(piv_s_month.sum(axis=0), axis=1) * 100
                     al_sup_ke = ['KE'] + [x for x in piv_s_month_ms.index if x != 'KE'] if 'KE' in piv_s_month_ms.index else piv_s_month_ms.index
-                    st.dataframe(piv_s_month_ms.loc[al_sorted].map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
+                    # 📌 오류 고침: al_sorted -> al_sup_ke
+                    st.dataframe(piv_s_month_ms.loc[al_sup_ke].map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
 
         with tab_s3:
             st.markdown("*(속도 최적화를 위해 상위 1,000건만 조율 표출합니다)*")
