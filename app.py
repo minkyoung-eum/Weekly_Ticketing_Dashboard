@@ -47,7 +47,7 @@ issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.st
 st.markdown("""
 <style>
     [data-testid="stSidebar"] {
-        background-color: #f8fafc !important;
+        background-color: #f1f5f9 !important;
     }
     .source-header-box {
         background-color: #f0f9ff;
@@ -64,7 +64,7 @@ st.markdown("""
         font-weight: 700 !important;
         color: #0f172a;
         padding-bottom: 8px;
-        border-bottom: 2px solid #e2e8f0;
+        border-bottom: 2px solid #cbd5e1;
         margin-top: 10px;
         margin-bottom: 12px;
     }
@@ -102,16 +102,26 @@ st.markdown("""
         padding: 2px 6px;
         border-radius: 4px;
     }
+    /* 필터 영역 시각화 및 선택값 구분 강조 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 10px !important;
-        padding: 15px !important;
+        border: 2px solid #0ea5e9 !important;
+        border-radius: 12px !important;
+        padding: 18px !important;
+        box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.1);
     }
+    /* Multi-select 선택된 태그 강조 */
     span[data-baseweb="tag"], [data-baseweb="tag"] {
-        background-color: #e0f2fe !important;
-        border: 1px solid #7dd3fc !important;
+        background-color: #0ea5e9 !important;
+        color: #ffffff !important;
+        border: none !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
     }
+    span[data-baseweb="tag"] span {
+        color: #ffffff !important;
+    }
+    /* 라디오 버튼 타이틀 가독성 */
     div[data-testid="stRadio"] > label {
         font-size: 16px !important;
         font-weight: 700 !important;
@@ -123,7 +133,7 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* O&D YoY Table Styling */
+    /* Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -255,16 +265,33 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Main Grouping Selection
-st.markdown('<div class="group-section-header">🗂️ 수송별 M/S</div>', unsafe_allow_html=True)
+# -------------------------------------------------------------
+# 상단 대시보드 구조 재편 (3/4수송 vs 6수송 별도 구분)
+# -------------------------------------------------------------
+st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 selected_group = st.radio(
-    "수송 타입을 선택하세요:",
+    "분석할 수송 영역을 선택하세요:",
     options=["✈️ 3/4수송 대시보드", "🌐 6수송 대시보드"],
     horizontal=True
 )
 
 ALL_OPTION = "전체 (All)"
 color_discrete_map = {'KE': '#00A1E9'}
+
+# 하단 범례 레이아웃 공통 함수
+def apply_bottom_legend(fig):
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.18,
+            xanchor="center",
+            x=0.5,
+            title=dict(text="")
+        ),
+        margin=dict(b=80)
+    )
+    return fig
 
 def format_dep_time(dep_val):
     try:
@@ -278,13 +305,16 @@ def format_dep_time(dep_val):
         return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
 # ==========================================
-# GROUP 1: 3/4수송 대시보드 (발매 & 공급)
+# GROUP 1: ✈️ 3/4수송 대시보드
 # ==========================================
 if selected_group == "✈️ 3/4수송 대시보드":
+    st.markdown("---")
+    st.markdown('<div style="font-size:16px; font-weight:700; color:#0284c7; margin-bottom:8px;">📌 3/4수송 소그룹 선택:</div>', unsafe_allow_html=True)
     sub_mode = st.radio(
-        "📊 3/4수송 대시보드 모드 선택:",
+        "3/4수송 세부 대시보드:",
         options=["🎟️ 발매 M/S 대시보드", "✈️ 공급 M/S 대시보드"],
-        horizontal=True
+        horizontal=True,
+        label_visibility="collapsed"
     )
 
     if sub_mode == "🎟️ 발매 M/S 대시보드":
@@ -297,9 +327,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df['노선'] = df['노선'].astype(str).str.strip()
 
-        # -------------------------------------------------------------
-        # 비율(Weight)의 역수(1 / Ratio) 계산 및 100%(1.0) 예외 처리
-        # -------------------------------------------------------------
+        # 가중치 역수 계산
         df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
         df_wt['Weight_ratio'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
         
@@ -310,10 +338,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_wt_subset['Route Code'] = df_wt_subset[wt_col_route].astype(str).str.strip()
         df_wt_subset['Dominant Marketing Airline'] = df_wt_subset[wt_col_al].astype(str).str.strip()
 
-        # 노선별 평균 발매비율 산출 (AVERAGEIF)
         route_avg_ratios = df_wt_subset.groupby('Route Code', observed=False)['Weight_ratio'].mean().to_dict()
 
-        # 1차 VLOOKUP 매칭
         merged_df = pd.merge(
             df, df_wt_subset[['Route Code', 'Dominant Marketing Airline', 'Weight_ratio']],
             left_on=['노선', 'Dominant Marketing Airline'],
@@ -321,10 +347,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             how='left'
         )
 
-        # 2차 Fallback (AVERAGEIF 대체)
         merged_df['Weight_ratio'] = merged_df['Weight_ratio'].fillna(merged_df['노선'].map(route_avg_ratios)).fillna(1.0)
         
-        # 📌 가중치 연산: 100%(1.0) 이상이면 1.0, 미만이면 역수(1 / 비율)를 곱해주는 함수
         def convert_to_reciprocal_weight(ratio):
             if pd.isna(ratio) or ratio <= 0 or ratio >= 1.0:
                 return 1.0
@@ -333,11 +357,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
         merged_df['Weight_num'] = merged_df['Weight_ratio'].apply(convert_to_reciprocal_weight)
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
 
-        # -------------------------------------------------------------
-        # 항공사별 가중 M/S 정규화 재배분 (SUMPRODUCT)
-        # -------------------------------------------------------------
+        # SUMPRODUCT 정규화
         merged_df['Raw_Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
-        
         route_sumproduct = merged_df.groupby('노선', observed=False)['Raw_Weighted_Value'].transform('sum')
         route_raw_sum = merged_df.groupby('노선', observed=False)['Value'].transform('sum')
 
@@ -371,7 +392,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-        # 정렬 동기화
         full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
         route_order_list = [str(x) for x in full_route_sum.index.tolist()]
 
@@ -394,19 +414,22 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
             st.form_submit_button("🚀 발매 필터 적용하기")
 
-        # 필터링 조건
+        # 메인 기본 필터링 마스크
         filter_mask = (
             (merged_df['노선'].astype(str).isin(selected_routes)) &
             (merged_df['Dominant Marketing Airline'].astype(str).isin(selected_airlines))
         )
         if month_col: filter_mask &= (merged_df[month_col].astype(str).isin(selected_dep_months))
-        if bound_col: filter_mask &= (merged_df[bound_col].astype(str).isin(selected_bounds))
-        if 'Ticket Type' in merged_df.columns: filter_mask &= (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types))
-        if channel_col: filter_mask &= (merged_df[channel_col].astype(str).isin(selected_channels))
-        if week_col: filter_mask &= (merged_df[week_col].astype(str).isin(selected_weeks))
         if ke_service_col: filter_mask &= (merged_df[ke_service_col].astype(str).isin(selected_ke_services))
 
-        filtered_df = merged_df[filter_mask]
+        # 메인 카드용 완전 적용 필터
+        main_filtered_mask = filter_mask.copy()
+        if bound_col: main_filtered_mask &= (merged_df[bound_col].astype(str).isin(selected_bounds))
+        if 'Ticket Type' in merged_df.columns: main_filtered_mask &= (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types))
+        if channel_col: main_filtered_mask &= (merged_df[channel_col].astype(str).isin(selected_channels))
+        if week_col: main_filtered_mask &= (merged_df[week_col].astype(str).isin(selected_weeks))
+
+        filtered_df = merged_df[main_filtered_mask]
 
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
         total_pax = filtered_df[val_col].sum()
@@ -454,6 +477,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         color='Dominant Marketing Airline', color_discrete_map=color_discrete_map
                     )
                     fig1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                    apply_bottom_legend(fig1)
                     st.plotly_chart(fig1, width="stretch")
 
                 with c2:
@@ -475,47 +499,128 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         hovertemplate="<b>노선: %{x}</b><br>항공사: %{fullData.name}<br>발매 점유율: %{y:.1f}%<extra></extra>"
                     )
                     fig2.update_layout(yaxis_title="발매 M/S 점유비 (%)", yaxis_ticksuffix="%")
+                    apply_bottom_legend(fig2)
                     st.plotly_chart(fig2, width="stretch")
 
                 st.markdown("---")
                 
-                # 📌 3. 발매 주차별 항공사별 발매량 (누적 그래프: barmode='stack' 연동)
-                if week_col and week_col in filtered_df.columns:
+                # -------------------------------------------------------------
+                # 📌 3. 발매 주차별 항공사별 발매량 (주차 필터에 반응하지 않음!)
+                # -------------------------------------------------------------
+                if week_col and week_col in merged_df.columns:
                     st.subheader("📅 주차별 발매 실적 추이")
-                    week_al_grp = filtered_df.groupby([week_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
                     
-                    fig_week = px.bar(
-                        week_al_grp, x=week_col, y=val_col, color='Dominant Marketing Airline',
-                        title='3. 발매 주차별 항공사별 발매량',
-                        barmode='stack', text=val_col,
-                        category_orders={'Dominant Marketing Airline': al_order, week_col: all_issue_weeks},
-                        color_discrete_map=color_discrete_map
-                    )
-                    fig_week.update_traces(
-                        texttemplate='%{text:,.0f}', textposition='inside',
-                        hovertemplate="<b>발매주차: %{x}</b><br>항공사: %{fullData.name}<br>발매량: %{y:,.0f}<extra></extra>"
-                    )
-                    fig_week.update_layout(yaxis_title=f"발매 실적{' (가중치)' if apply_weight_toggle else ''}")
-                    st.plotly_chart(fig_week, width="stretch")
+                    # 주차 필터만 빼고 마스킹 적용
+                    mask_no_week = filter_mask.copy()
+                    if bound_col: mask_no_week &= (merged_df[bound_col].astype(str).isin(selected_bounds))
+                    if 'Ticket Type' in merged_df.columns: mask_no_week &= (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types))
+                    if channel_col: mask_no_week &= (merged_df[channel_col].astype(str).isin(selected_channels))
+
+                    df_no_week = merged_df[mask_no_week]
+
+                    if not df_no_week.empty:
+                        week_al_grp = df_no_week.groupby([week_col, 'Dominant Marketing Airline'], observed=False)[val_col].sum().reset_index()
+                        
+                        # 주차별 전체 총 실적 산출 (막대 상단 표출용)
+                        week_totals = week_al_grp.groupby(week_col, observed=False)[val_col].sum().reset_index()
+                        week_totals_dict = dict(zip(week_totals[week_col].astype(str), week_totals[val_col]))
+
+                        # 주차 및 항공사별 M/S 점유비 계산 (막대 안 표출용)
+                        week_al_grp['Week_Total'] = week_al_grp[week_col].map(week_totals_dict)
+                        week_al_grp['MS_Percent'] = np.where(week_al_grp['Week_Total'] > 0, (week_al_grp[val_col] / week_al_grp['Week_Total']) * 100, 0)
+                        week_al_grp['Text_Display'] = week_al_grp['MS_Percent'].map(lambda x: f"{x:.1f}%" if x >= 3.0 else "")
+
+                        fig_week = px.bar(
+                            week_al_grp, x=week_col, y=val_col, color='Dominant Marketing Airline',
+                            title='3. 발매 주차별 항공사별 발매량 (주차 필터 독립)',
+                            barmode='stack', text='Text_Display',
+                            category_orders={'Dominant Marketing Airline': al_order, week_col: all_issue_weeks},
+                            color_discrete_map=color_discrete_map,
+                            custom_data=['Dominant Marketing Airline', val_col, 'MS_Percent']
+                        )
+                        
+                        # 막대 안: 점유비(%), 마우스 호버: 항공사 + 발매량 + 점유비
+                        fig_week.update_traces(
+                            textposition='inside',
+                            hovertemplate="<b>항공사: %{customdata[0]}</b><br>발매 실적: %{customdata[1]:,.0f}<br>점유비: %{customdata[2]:.1f}%<extra></extra>"
+                        )
+
+                        # 막대 상단에 주차별 총 발매 실적 표시 (Scatter text)
+                        valid_weeks = [w for w in all_issue_weeks if w in week_totals_dict]
+                        total_y_vals = [week_totals_dict[w] for w in valid_weeks]
+
+                        fig_week.add_trace(go.Scatter(
+                            x=valid_weeks,
+                            y=total_y_vals,
+                            mode='text',
+                            text=[f"<b>{v:,.0f}</b>" for v in total_y_vals],
+                            textposition='top center',
+                            showlegend=False,
+                            hoverinfo='skip'
+                        ))
+
+                        fig_week.update_layout(yaxis_title=f"발매 실적{' (가중치)' if apply_weight_toggle else ''}")
+                        apply_bottom_legend(fig_week)
+                        st.plotly_chart(fig_week, width="stretch")
 
                 st.markdown("---")
                 c3, c4, c5 = st.columns(3)
+                
+                # -------------------------------------------------------------
+                # 📌 4. BOUND별 점유비 (BOUND 필터에 반응하지 않음)
+                # -------------------------------------------------------------
                 with c3:
                     if bound_col:
-                        bound_pie_df = filtered_df.groupby(bound_col, observed=False)[val_col].sum().reset_index()
+                        mask_no_bound = filter_mask.copy()
+                        if week_col: mask_no_bound &= (merged_df[week_col].astype(str).isin(selected_weeks))
+                        if 'Ticket Type' in merged_df.columns: mask_no_bound &= (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types))
+                        if channel_col: mask_no_bound &= (merged_df[channel_col].astype(str).isin(selected_channels))
+
+                        df_no_bound = merged_df[mask_no_bound]
+                        bound_pie_df = df_no_bound.groupby(bound_col, observed=False)[val_col].sum().reset_index()
+                        
                         fig3 = px.pie(
                             bound_pie_df, values=val_col, names=bound_col, 
-                            title='4. BOUND별 점유비', hole=0.4
+                            title='4. BOUND별 점유비 (Bound 필터 독립)', hole=0.4
                         )
                         fig3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Bound: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                        apply_bottom_legend(fig3)
                         st.plotly_chart(fig3, width="stretch")
+
+                # -------------------------------------------------------------
+                # 📌 5. TRIP TYPE별 점유비 (TRIP TYPE 필터에 반응하지 않음)
+                # -------------------------------------------------------------
                 with c4:
-                    if 'Ticket Type' in filtered_df.columns:
-                        fig4 = px.pie(filtered_df.groupby('Ticket Type', observed=False)[val_col].sum().reset_index(), values=val_col, names='Ticket Type', title='5. TRIP TYPE별 점유비', hole=0.4)
+                    if 'Ticket Type' in merged_df.columns:
+                        mask_no_tt = filter_mask.copy()
+                        if week_col: mask_no_tt &= (merged_df[week_col].astype(str).isin(selected_weeks))
+                        if bound_col: mask_no_tt &= (merged_df[bound_col].astype(str).isin(selected_bounds))
+                        if channel_col: mask_no_tt &= (merged_df[channel_col].astype(str).isin(selected_channels))
+
+                        df_no_tt = merged_df[mask_no_tt]
+                        tt_pie_df = df_no_tt.groupby('Ticket Type', observed=False)[val_col].sum().reset_index()
+
+                        fig4 = px.pie(tt_pie_df, values=val_col, names='Ticket Type', title='5. TRIP TYPE별 점유비 (Type 필터 독립)', hole=0.4)
+                        fig4.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>Trip Type: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                        apply_bottom_legend(fig4)
                         st.plotly_chart(fig4, width="stretch")
+
+                # -------------------------------------------------------------
+                # 📌 6. 판매 채널별 점유비 (판매채널 필터에 반응하지 않음)
+                # -------------------------------------------------------------
                 with c5:
                     if channel_col:
-                        fig5 = px.pie(filtered_df.groupby(channel_col, observed=False)[val_col].sum().reset_index(), values=val_col, names=channel_col, title='6. 판매 채널별 점유비', hole=0.4)
+                        mask_no_chan = filter_mask.copy()
+                        if week_col: mask_no_chan &= (merged_df[week_col].astype(str).isin(selected_weeks))
+                        if bound_col: mask_no_chan &= (merged_df[bound_col].astype(str).isin(selected_bounds))
+                        if 'Ticket Type' in merged_df.columns: mask_no_chan &= (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types))
+
+                        df_no_chan = merged_df[mask_no_chan]
+                        chan_pie_df = df_no_chan.groupby(channel_col, observed=False)[val_col].sum().reset_index()
+
+                        fig5 = px.pie(chan_pie_df, values=val_col, names=channel_col, title='6. 판매 채널별 점유비 (채널 필터 독립)', hole=0.4)
+                        fig5.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>판매채널: %{label}</b><br>실적: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                        apply_bottom_legend(fig5)
                         st.plotly_chart(fig5, width="stretch")
 
         with tab2:
@@ -538,6 +643,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.dataframe(filtered_df.head(1000), width="stretch")
 
     else:
+        # ==========================================
+        # ✈️ 공급 M/S 대시보드
+        # ==========================================
         if df_sup_raw is None:
             st.info("👈 좌측 사이드바에서 [공급_9월1주차_CSV.csv] 파일을 업로드해주세요.")
             st.stop()
@@ -631,119 +739,95 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        tab_s1, tab_s2, tab_s3 = st.tabs(["📈 공급 시각화 분석 차트", "📊 공급 M/S 피벗 테이블", "📋 공급 Raw View"])
+        # 📌 요청반영: 공급 M/S 피벗테이블 탭 및 Raw View 탭 삭제, 시각화 전용 단일 화면 표출
+        st.subheader(f"📊 항공사 / 노선별 공급 M/S 분석 ({metric_mode})")
+        if not filtered_sup.empty:
+            sup_al_order = [al for al in sup_airlines if al in filtered_sup['Airline'].unique()]
+            
+            cs1, cs2 = st.columns([1, 1.1])
+            with cs1:
+                pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
+                fig_s1 = px.pie(
+                    pie_sup_al, values=target_val, names='Airline',
+                    title='1. 항공사별 전체 공급 M/S 점유비', hole=0.4,
+                    category_orders={'Airline': sup_al_order},
+                    color='Airline', color_discrete_map=color_discrete_map
+                )
+                fig_s1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
+                apply_bottom_legend(fig_s1)
+                st.plotly_chart(fig_s1, width="stretch")
 
-        with tab_s1:
-            st.subheader(f"📊 항공사 / 노선별 공급 M/S 분석 ({metric_mode})")
-            if not filtered_sup.empty:
-                sup_al_order = [al for al in sup_airlines if al in filtered_sup['Airline'].unique()]
+            # 📌 요청반영: 2번 영역을 1번 차트 피벗 표 형태로 표출
+            with cs2:
+                st.markdown("##### 2. 항공사별 공급 실적 및 M/S 요약 (Pivot Table)")
+                pie_sup_al['공급 M/S (%)'] = (pie_sup_al[target_val] / pie_sup_al[target_val].sum()) * 100
+                pie_sup_al = pie_sup_al.sort_values(by=target_val, ascending=False).reset_index(drop=True)
                 
-                cs1, cs2 = st.columns(2)
-                with cs1:
-                    pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
-                    fig_s1 = px.pie(
-                        pie_sup_al, values=target_val, names='Airline',
-                        title='1. 항공사별 전체 공급 M/S 점유비', hole=0.4,
-                        category_orders={'Airline': sup_al_order},
-                        color='Airline', color_discrete_map=color_discrete_map
-                    )
-                    fig_s1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
-                    st.plotly_chart(fig_s1, width="stretch")
+                # 천단위 콤마 및 퍼센트 포맷팅
+                pie_sup_al_disp = pie_sup_al.copy()
+                pie_sup_al_disp.columns = ['항공사', f'공급 실적 ({metric_mode.split()[0]})', '공급 M/S (%)']
+                pie_sup_al_disp[f'공급 실적 ({metric_mode.split()[0]})'] = pie_sup_al_disp[f'공급 실적 ({metric_mode.split()[0]})'].map(lambda x: f"{x:,.0f}")
+                pie_sup_al_disp['공급 M/S (%)'] = pie_sup_al_disp['공급 M/S (%)'].map(lambda x: f"{x:.1f}%")
 
-                with cs2:
-                    bar_sup_grp = filtered_sup.groupby(['노선', 'Airline'], observed=False)[target_val].sum().reset_index()
-                    route_totals = bar_sup_grp.groupby('노선', observed=False)[target_val].transform('sum')
-                    bar_sup_grp['MS_Percent'] = (bar_sup_grp[target_val] / route_totals) * 100
+                st.dataframe(pie_sup_al_disp, width="stretch", height=380)
 
-                    fig_s2 = px.bar(
-                        bar_sup_grp, x='노선', y='MS_Percent', color='Airline',
-                        title='2. 노선별 항공사 공급 점유비 (M/S 막대그래프)',
-                        barmode='stack', text='MS_Percent',
-                        category_orders={'Airline': sup_airlines, '노선': sup_routes},
-                        color_discrete_map=color_discrete_map
-                    )
-                    fig_s2.update_traces(
-                        texttemplate='%{text:.1f}%', textposition='inside',
-                        hovertemplate="<b>노선: %{x}</b><br>항공사: %{fullData.name}<br>점유율: %{y:.1f}%<extra></extra>"
-                    )
-                    fig_s2.update_layout(yaxis_title="M/S 점유비 (%)", yaxis_ticksuffix="%")
-                    st.plotly_chart(fig_s2, width="stretch")
-
-                st.markdown("---")
-                cs3, cs4 = st.columns(2)
-                with cs3:
-                    if '출발 시간대' in filtered_sup.columns:
-                        fig_s3 = px.pie(filtered_sup.groupby('출발 시간대', observed=False)[target_val].sum().reset_index(), values=target_val, names='출발 시간대', title='3. 출발 시간대별 공급 비중', hole=0.4)
-                        fig_s3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>시간대: %{label}</b><br>공급량: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>")
-                        st.plotly_chart(fig_s3, width="stretch")
-                
-                with cs4:
-                    if sup_month_col:
-                        sup_month_df = filtered_sup.groupby(sup_month_col, observed=False)[target_val].sum().reset_index()
-                        fig_s4 = px.bar(
-                            sup_month_df, x=sup_month_col, y=target_val,
-                            title='4. 출발 월별 공급 분포 (막대그래프)',
-                            text=target_val,
-                            color_discrete_sequence=['#0ea5e9']
-                        )
-                        fig_s4.update_traces(
-                            texttemplate='%{text:,.0f}', textposition='outside',
-                            hovertemplate="<b>출발월: %{x}</b><br>공급량: %{y:,.0f}<extra></extra>"
-                        )
-                        fig_s4.update_layout(yaxis_title=f"공급 ({'좌석수' if '공급석' in metric_mode else '편수'})")
-                        st.plotly_chart(fig_s4, width="stretch")
-
-                st.markdown("---")
-                st.subheader("✈️ 노선 선택 및 항공사별 운항 스케줄 타임라인 차트")
-                available_routes = sorted([str(x) for x in filtered_sup['노선'].dropna().unique()])
-                if available_routes:
-                    col_sel_route, _ = st.columns([2, 2])
-                    with col_sel_route:
-                        selected_single_route = st.selectbox("📌 스케줄을 조회할 노선을 선택하세요:", options=available_routes)
-                    
-                    df_schedule = filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
-                    if not df_schedule.empty and 'Dep Time' in df_schedule.columns:
-                        time_tuples = df_schedule['Dep Time'].apply(format_dep_time)
-                        df_schedule['Start_Time'] = [t[0] for t in time_tuples]
-                        df_schedule['End_Time'] = [t[1] for t in time_tuples]
-
-                        fig_timeline = px.timeline(
-                            df_schedule,
-                            x_start="Start_Time", x_end="End_Time",
-                            y="Airline", color="Airline", text="Airline",
-                            title=f"5. [{selected_single_route}] 노선 하루 출발 시간대별 운항 스케줄 타임라인",
-                            color_discrete_map=color_discrete_map,
-                            category_orders={'Airline': sup_airlines}
-                        )
-                        fig_timeline.update_yaxes(autorange="reversed", title="항공사")
-                        fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
-                        fig_timeline.update_traces(textposition='inside', hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{x}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>", customdata=df_schedule[['Seats_num']])
-                        fig_timeline.update_layout(height=400, showlegend=True)
-                        st.plotly_chart(fig_timeline, width="stretch")
-
-        with tab_s2:
-            st.markdown(f"##### 📌 노선 및 출발월별 공급 M/S 매트릭스 ({metric_mode})")
-            ts1, ts2 = st.columns([1.1, 1])
-            with ts1:
-                piv_s_route = filtered_sup.pivot_table(index='노선', columns='Airline', values=target_val, aggfunc='sum', fill_value=0, observed=False)
-                cols_sup_ke = ['KE'] + [x for x in piv_s_route.columns if x != 'KE'] if 'KE' in piv_s_route.columns else piv_s_route.columns
-                piv_s_route = piv_s_route[cols_sup_ke]
-                piv_s_route_ms = piv_s_route.divide(piv_s_route.sum(axis=1), axis=0) * 100
-                st.dataframe(piv_s_route_ms.map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
-            with ts2:
+            st.markdown("---")
+            cs3, cs4 = st.columns(2)
+            with cs3:
+                if '출발 시간대' in filtered_sup.columns:
+                    fig_s3 = px.pie(filtered_sup.groupby('출발 시간대', observed=False)[target_val].sum().reset_index(), values=target_val, names='출발 시간대', title='3. 출발 시간대별 공급 비중', hole=0.4)
+                    fig_s3.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>시간대: %{label}</b><br>공급량: %{value:,.0f}<br>비중: %{percent:.1%}<extra></extra>")
+                    apply_bottom_legend(fig_s3)
+                    st.plotly_chart(fig_s3, width="stretch")
+            
+            with cs4:
                 if sup_month_col:
-                    piv_s_month = filtered_sup.pivot_table(index='Airline', columns=sup_month_col, values=target_val, aggfunc='sum', fill_value=0, observed=False)
-                    piv_s_month_ms = piv_s_month.divide(piv_s_month.sum(axis=0), axis=1) * 100
-                    al_sup_ke = ['KE'] + [x for x in piv_s_month_ms.index if x != 'KE'] if 'KE' in piv_s_month_ms.index else piv_s_month_ms.index
-                    # 📌 오류 고침: al_sorted -> al_sup_ke
-                    st.dataframe(piv_s_month_ms.loc[al_sup_ke].map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
+                    sup_month_df = filtered_sup.groupby(sup_month_col, observed=False)[target_val].sum().reset_index()
+                    fig_s4 = px.bar(
+                        sup_month_df, x=sup_month_col, y=target_val,
+                        title='4. 출발 월별 공급 분포 (막대그래프)',
+                        text=target_val,
+                        color_discrete_sequence=['#0ea5e9']
+                    )
+                    fig_s4.update_traces(
+                        texttemplate='%{text:,.0f}', textposition='outside',
+                        hovertemplate="<b>출발월: %{x}</b><br>공급량: %{y:,.0f}<extra></extra>"
+                    )
+                    fig_s4.update_layout(yaxis_title=f"공급 ({'좌석수' if '공급석' in metric_mode else '편수'})")
+                    apply_bottom_legend(fig_s4)
+                    st.plotly_chart(fig_s4, width="stretch")
 
-        with tab_s3:
-            st.markdown("*(속도 최적화를 위해 상위 1,000건만 조율 표출합니다)*")
-            st.dataframe(filtered_sup.head(1000), width="stretch")
+            st.markdown("---")
+            st.subheader("✈️ 노선 선택 및 항공사별 운항 스케줄 타임라인 차트")
+            available_routes = sorted([str(x) for x in filtered_sup['노선'].dropna().unique()])
+            if available_routes:
+                col_sel_route, _ = st.columns([2, 2])
+                with col_sel_route:
+                    selected_single_route = st.selectbox("📌 스케줄을 조회할 노선을 선택하세요:", options=available_routes)
+                
+                df_schedule = filtered_sup[filtered_sup['노선'] == selected_single_route].copy()
+                if not df_schedule.empty and 'Dep Time' in df_schedule.columns:
+                    time_tuples = df_schedule['Dep Time'].apply(format_dep_time)
+                    df_schedule['Start_Time'] = [t[0] for t in time_tuples]
+                    df_schedule['End_Time'] = [t[1] for t in time_tuples]
+
+                    fig_timeline = px.timeline(
+                        df_schedule,
+                        x_start="Start_Time", x_end="End_Time",
+                        y="Airline", color="Airline", text="Airline",
+                        title=f"5. [{selected_single_route}] 노선 하루 출발 시간대별 운항 스케줄 타임라인",
+                        color_discrete_map=color_discrete_map,
+                        category_orders={'Airline': sup_airlines}
+                    )
+                    fig_timeline.update_yaxes(autorange="reversed", title="항공사")
+                    fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
+                    fig_timeline.update_traces(textposition='inside', hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{x}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>", customdata=df_schedule[['Seats_num']])
+                    fig_timeline.update_layout(height=400, showlegend=True)
+                    apply_bottom_legend(fig_timeline)
+                    st.plotly_chart(fig_timeline, width="stretch")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (6TRF TEST.csv)
+# GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -976,6 +1060,7 @@ else:
                 color_discrete_map={'26년 (CY)': '#0ea5e9', '25년 (PY)': '#cbd5e1'}
             )
             fig_6_yoy.update_traces(texttemplate='%{y:,.0f}', textposition='outside')
+            apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
     # ------------------------------------------
