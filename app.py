@@ -189,9 +189,9 @@ st.markdown("""
 # Sidebar File Uploader Section
 st.sidebar.header("📁 데이터 파일 업로드")
 
-uploaded_iss = st.sidebar.file_uploader("1. 발매/3/4수송 데이터 (Ticketing-test_2.csv)", type=['csv'])
+uploaded_iss = st.sidebar.file_uploader("1. 발매/3/4수송 데이터 (34수송_9월1주차_CSV.csv)", type=['csv'])
 uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (가중치 파일.csv)", type=['csv'])
-uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (공급.csv/xlsx)", type=['csv', 'xlsx'])
+uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (공급_9월1주차_CSV.csv)", type=['csv', 'xlsx'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (6TRF TEST.csv/xlsx)", type=['csv', 'xlsx'])
 
 # Optimized Load Logic Function
@@ -208,11 +208,17 @@ def load_optimized_csv(file_or_path):
 @st.cache_data(max_entries=5, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
-    if os.path.exists('Ticketing-test_2.csv'):
+    if os.path.exists('34수송_9월1주차_CSV.csv'):
+        df_iss = load_optimized_csv('34수송_9월1주차_CSV.csv')
+    elif os.path.exists('Ticketing-test_2.csv'):
         df_iss = load_optimized_csv('Ticketing-test_2.csv')
+        
     if os.path.exists('가중치 파일.csv'):
         df_wt = load_optimized_csv('가중치 파일.csv')
-    if os.path.exists('공급 (9월 1주).csv'):
+        
+    if os.path.exists('공급_9월1주차_CSV.csv'):
+        df_sup = load_optimized_csv('공급_9월1주차_CSV.csv')
+    elif os.path.exists('공급 (9월 1주).csv'):
         df_sup = load_optimized_csv('공급 (9월 1주).csv')
     elif os.path.exists('공급.xlsx'):
         df_sup = pd.read_excel('공급.xlsx', sheet_name='공급_RAW')
@@ -283,7 +289,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     if sub_mode == "🎟️ 발매 M/S 대시보드":
         if df_iss_raw is None or df_wt_raw is None:
-            st.info("👈 좌측 사이드바에서 [Ticketing-test_2.csv]와 [가중치 파일.csv]를 업로드해주세요.")
+            st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV.csv]와 [가중치 파일.csv]를 업로드해주세요.")
             st.stop()
 
         df = df_iss_raw.copy()
@@ -306,30 +312,40 @@ if selected_group == "✈️ 3/4수송 대시보드":
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
         merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
 
-        week_col = '발매주차' if '발매주차' in merged_df.columns else ('Issue Week' if 'Issue Week' in merged_df.columns else ('Week' if 'Week' in merged_df.columns else None))
+        week_col = '발매 주차' if '발매 주차' in merged_df.columns else ('발매주차' if '발매주차' in merged_df.columns else ('Issue Week' if 'Issue Week' in merged_df.columns else None))
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
 
-        all_dep_months = sorted([str(x) for x in merged_df['출발 월'].dropna().unique()])
-        all_bounds = sorted([str(x) for x in merged_df['Bound'].dropna().unique()])
-        all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()])
-        all_channels = sorted([str(x) for x in merged_df['판매채널'].dropna().unique()])
+        month_col = '출발월' if '출발월' in merged_df.columns else ('출발 월' if '출발 월' in merged_df.columns else None)
+        all_dep_months = sorted([str(x) for x in merged_df[month_col].dropna().unique()]) if month_col else []
+        
+        bound_col = '수송' if '수송' in merged_df.columns else ('Bound' if 'Bound' in merged_df.columns else None)
+        all_bounds = sorted([str(x) for x in merged_df[bound_col].dropna().unique()]) if bound_col else []
 
-        ke_service_col = 'KE취항노선 여부' if 'KE취항노선 여부' in merged_df.columns else ('KE취항여부' if 'KE취항여부' in merged_df.columns else None)
+        all_ticket_types = sorted([str(x) for x in merged_df['Ticket Type'].dropna().unique()]) if 'Ticket Type' in merged_df.columns else []
+        
+        channel_col = '발매채널' if '발매채널' in merged_df.columns else ('판매채널' if '판매채널' in merged_df.columns else None)
+        all_channels = sorted([str(x) for x in merged_df[channel_col].dropna().unique()]) if channel_col else []
+
+        ke_service_col = 'KE취항여부' if 'KE취항여부' in merged_df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in merged_df.columns else None)
         all_ke_services = sorted([str(x) for x in merged_df[ke_service_col].dropna().unique()]) if ke_service_col else []
 
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
+        # -------------------------------------------------------------
+        # 가중치 스위치 바깥 배치 (실시간 사이드바 필터 정렬 동기화)
+        # -------------------------------------------------------------
         st.sidebar.markdown("---")
         st.sidebar.header("🔍 발매 대시보드 필터")
-        with st.sidebar.form("iss_filter_form"):
-            apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
-            
-            # 스위치 상태에 직관적으로 맞춘 노선 정렬 지표 결정
-            target_metric = 'Weighted_Value' if apply_weight_toggle else 'Value'
-            full_route_sum = merged_df.groupby('노선', observed=False)[target_metric].sum().sort_values(ascending=False)
-            route_order_list = [str(x) for x in full_route_sum.index.tolist()]
+        apply_weight_toggle = st.sidebar.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
 
+        val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
+
+        # 토글 상태에 따라 동일하게 정렬된 노선 순서
+        full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
+        route_order_list = [str(x) for x in full_route_sum.index.tolist()]
+
+        with st.sidebar.form("iss_filter_form"):
             def get_form_selection(label, full_list, default_vals=None):
                 options = [ALL_OPTION] + full_list
                 default_choice = default_vals if default_vals is not None else [ALL_OPTION]
@@ -340,28 +356,24 @@ if selected_group == "✈️ 3/4수송 대시보드":
             selected_weeks = get_form_selection("발매 주차", all_issue_weeks) if week_col else []
             default_ke = ["취항"] if "취항" in all_ke_services else [ALL_OPTION]
             selected_ke_services = get_form_selection("KE 취항 여부", all_ke_services, default_vals=default_ke) if ke_service_col else all_ke_services
-            selected_dep_months = get_form_selection("출발 월", all_dep_months)
-            selected_bounds = get_form_selection("Bound", all_bounds)
+            selected_dep_months = get_form_selection("출발 월", all_dep_months) if month_col else []
+            selected_bounds = get_form_selection("Bound", all_bounds) if bound_col else []
             selected_ticket_types = get_form_selection("Ticket Type (여정)", all_ticket_types)
-            selected_channels = get_form_selection("판매채널", all_channels)
+            selected_channels = get_form_selection("판매채널", all_channels) if channel_col else []
             selected_airlines = get_form_selection("항공사 (KE 최우선)", all_airlines)
 
             st.form_submit_button("🚀 발매 필터 적용하기")
 
-        val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
-
         filter_mask = (
             (merged_df['노선'].astype(str).isin(selected_routes)) &
-            (merged_df['출발 월'].astype(str).isin(selected_dep_months)) &
-            (merged_df['Bound'].astype(str).isin(selected_bounds)) &
-            (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types)) &
-            (merged_df['판매채널'].astype(str).isin(selected_channels)) &
             (merged_df['Dominant Marketing Airline'].astype(str).isin(selected_airlines))
         )
-        if week_col:
-            filter_mask &= (merged_df[week_col].astype(str).isin(selected_weeks))
-        if ke_service_col:
-            filter_mask &= (merged_df[ke_service_col].astype(str).isin(selected_ke_services))
+        if month_col: filter_mask &= (merged_df[month_col].astype(str).isin(selected_dep_months))
+        if bound_col: filter_mask &= (merged_df[bound_col].astype(str).isin(selected_bounds))
+        if 'Ticket Type' in merged_df.columns: filter_mask &= (merged_df['Ticket Type'].astype(str).isin(selected_ticket_types))
+        if channel_col: filter_mask &= (merged_df[channel_col].astype(str).isin(selected_channels))
+        if week_col: filter_mask &= (merged_df[week_col].astype(str).isin(selected_weeks))
+        if ke_service_col: filter_mask &= (merged_df[ke_service_col].astype(str).isin(selected_ke_services))
 
         filtered_df = merged_df[filter_mask]
 
@@ -377,7 +389,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             top_al = str(al_sum.idxmax())
             top_ms = (al_sum.max() / total_pax) * 100
 
-        # 선택된 필터 결과 내 동일 지표 기준 1위 노선 추출
+        # 선택된 필터 결과 내 동일 기준 1위 노선
         if not filtered_df.empty and total_pax > 0:
             filtered_route_sum = filtered_df.groupby('노선', observed=False)[val_col].sum()
             top_route = str(filtered_route_sum.idxmax())
@@ -438,14 +450,17 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown("---")
                 c3, c4, c5 = st.columns(3)
                 with c3:
-                    fig3 = px.pie(filtered_df.groupby('Bound', observed=False)[val_col].sum().reset_index(), values=val_col, names='Bound', title='3. BOUND별 점유비', hole=0.4)
-                    st.plotly_chart(fig3, width="stretch")
+                    if bound_col:
+                        fig3 = px.pie(filtered_df.groupby(bound_col, observed=False)[val_col].sum().reset_index(), values=val_col, names=bound_col, title='3. BOUND별 점유비', hole=0.4)
+                        st.plotly_chart(fig3, width="stretch")
                 with c4:
-                    fig4 = px.pie(filtered_df.groupby('Ticket Type', observed=False)[val_col].sum().reset_index(), values=val_col, names='Ticket Type', title='4. TRIP TYPE별 점유비', hole=0.4)
-                    st.plotly_chart(fig4, width="stretch")
+                    if 'Ticket Type' in filtered_df.columns:
+                        fig4 = px.pie(filtered_df.groupby('Ticket Type', observed=False)[val_col].sum().reset_index(), values=val_col, names='Ticket Type', title='4. TRIP TYPE별 점유비', hole=0.4)
+                        st.plotly_chart(fig4, width="stretch")
                 with c5:
-                    fig5 = px.pie(filtered_df.groupby('판매채널', observed=False)[val_col].sum().reset_index(), values=val_col, names='판매채널', title='5. 판매 채널별 점유비', hole=0.4)
-                    st.plotly_chart(fig5, width="stretch")
+                    if channel_col:
+                        fig5 = px.pie(filtered_df.groupby(channel_col, observed=False)[val_col].sum().reset_index(), values=val_col, names=channel_col, title='5. 판매 채널별 점유비', hole=0.4)
+                        st.plotly_chart(fig5, width="stretch")
 
         with tab2:
             st.markdown("##### 📌 주차별 및 노선별 발매 M/S 매트릭스")
@@ -468,7 +483,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
     else:
         if df_sup_raw is None:
-            st.info("👈 좌측 사이드바에서 [공급 (9월 1주).csv] 파일을 업로드해주세요.")
+            st.info("👈 좌측 사이드바에서 [공급_9월1주차_CSV.csv] 파일을 업로드해주세요.")
             st.stop()
 
         df_sup = df_sup_raw.copy()
@@ -492,7 +507,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
             df_sup['Flights_num'] = 1
 
         sup_routes = df_sup.groupby('노선', observed=False)['Seats_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
-        sup_months = sorted([str(x) for x in df_sup['출발 월'].dropna().unique()]) if '출발 월' in df_sup.columns else []
+        
+        sup_month_col = '출발월' if '출발월' in df_sup.columns else ('출발 월' if '출발 월' in df_sup.columns else ('Travel Month' if 'Travel Month' in df_sup.columns else None))
+        sup_months = sorted([str(x) for x in df_sup[sup_month_col].dropna().unique()]) if sup_month_col else []
+        
         sup_time_cats = sorted([str(x) for x in df_sup['출발 시간대'].dropna().unique()]) if '출발 시간대' in df_sup.columns else []
         
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
@@ -515,7 +533,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             selected_sup_routes = get_sup_selection("노선 (공급석 순)", sup_routes)
             default_sup_ke = ["취항"] if "취항" in sup_ke_services else [ALL_OPTION]
             selected_sup_ke_services = get_sup_selection("KE 취항 여부", sup_ke_services, default_vals=default_sup_ke) if sup_ke_col else sup_ke_services
-            selected_sup_months = get_sup_selection("출발 월", sup_months)
+            selected_sup_months = get_sup_selection("출발 월", sup_months) if sup_month_col else []
             selected_sup_times = get_sup_selection("출발 시간대", sup_time_cats)
             selected_sup_airlines = get_sup_selection("항공사 (KE 최우선)", sup_airlines)
 
@@ -529,8 +547,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
         )
         if sup_ke_col:
             filter_mask &= (df_sup[sup_ke_col].astype(str).isin(selected_sup_ke_services))
-        if '출발 월' in df_sup.columns:
-            filter_mask &= (df_sup['출발 월'].astype(str).isin(selected_sup_months))
+        if sup_month_col:
+            filter_mask &= (df_sup[sup_month_col].astype(str).isin(selected_sup_months))
         if '출발 시간대' in df_sup.columns:
             filter_mask &= (df_sup['출발 시간대'].astype(str).isin(selected_sup_times))
 
@@ -604,10 +622,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_s3, width="stretch")
                 
                 with cs4:
-                    if '출발 월' in filtered_sup.columns:
-                        sup_month_df = filtered_sup.groupby('출발 월', observed=False)[target_val].sum().reset_index()
+                    if sup_month_col:
+                        sup_month_df = filtered_sup.groupby(sup_month_col, observed=False)[target_val].sum().reset_index()
                         fig_s4 = px.bar(
-                            sup_month_df, x='출발 월', y=target_val,
+                            sup_month_df, x=sup_month_col, y=target_val,
                             title='4. 출발 월별 공급 분포 (막대그래프)',
                             text=target_val,
                             color_discrete_sequence=['#0ea5e9']
@@ -657,8 +675,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 piv_s_route_ms = piv_s_route.divide(piv_s_route.sum(axis=1), axis=0) * 100
                 st.dataframe(piv_s_route_ms.map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
             with ts2:
-                if '출발 월' in filtered_sup.columns:
-                    piv_s_month = filtered_sup.pivot_table(index='Airline', columns='출발 월', values=target_val, aggfunc='sum', fill_value=0, observed=False)
+                if sup_month_col:
+                    piv_s_month = filtered_sup.pivot_table(index='Airline', columns=sup_month_col, values=target_val, aggfunc='sum', fill_value=0, observed=False)
                     piv_s_month_ms = piv_s_month.divide(piv_s_month.sum(axis=0), axis=1) * 100
                     al_sup_ke = ['KE'] + [x for x in piv_s_month_ms.index if x != 'KE'] if 'KE' in piv_s_month_ms.index else piv_s_month_ms.index
                     st.dataframe(piv_s_month_ms.loc[al_sup_ke].map(lambda x: f"{x:.1f}%" if pd.notnull(x) and x > 0 else "0.0%"), width="stretch")
