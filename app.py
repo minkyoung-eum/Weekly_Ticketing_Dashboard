@@ -5,18 +5,21 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 import os
+import zipfile
 
-# 1. Streamlit 테마 설정 자동 생성 (.streamlit/config.toml)
+# 1. Streamlit 테마 및 파일 업로드 용량 제한 설정 (1000MB로 확장)
 os.makedirs(".streamlit", exist_ok=True)
 config_path = os.path.join(".streamlit", "config.toml")
-if not os.path.exists(config_path):
-    with open(config_path, "w", encoding="utf-8") as f:
-        f.write("""[theme]
+with open(config_path, "w", encoding="utf-8") as f:
+    f.write("""[theme]
 primaryColor = "#0ea5e9"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f8fafc"
 textColor = "#0f172a"
 font = "sans serif"
+
+[server]
+maxUploadSize = 1000
 """)
 
 # Page Config
@@ -131,7 +134,7 @@ st.markdown("""
         font-weight: 600 !important;
     }
 
-    /* O&D YoY Table Styling */
+    /* Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -172,7 +175,7 @@ st.markdown("""
         white-space: nowrap;
         color: #334155;
     }
-    .yoy-table td.ke-cell {
+    .yoy-table td.ke-cell, .yoy-table tr.ke-row {
         background-color: #ecfdf5 !important;
         font-weight: 800 !important;
         color: #047857 !important;
@@ -201,59 +204,66 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar File Uploader Section
+# Sidebar File Uploader Section (ZIP, CSV, XLSX, PARQUET 지원)
 st.sidebar.header("📁 데이터 파일 업로드")
 
-uploaded_iss = st.sidebar.file_uploader("1. 발매/3/4수송 데이터 (34수송_9월1주차_CSV.csv)", type=['csv'])
-uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (가중치 파일.csv)", type=['csv'])
-uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (공급_9월1주차_CSV.csv)", type=['csv', 'xlsx'])
-uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (6TRF TEST.csv/xlsx)", type=['csv', 'xlsx'])
+uploaded_iss = st.sidebar.file_uploader("1. 발매/3/4수송 데이터 (CSV, ZIP)", type=['csv', 'zip', 'parquet'])
+uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['csv', 'zip', 'parquet'])
+uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
+uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
+# ZIP/CSV/Parquet 범용 로더 지원
 @st.cache_data(max_entries=5, ttl=3600)
-def load_optimized_csv(file_or_path):
-    if file_or_path is None:
+def load_smart_file(uploaded_file):
+    if uploaded_file is None:
         return None
-    return pd.read_csv(file_or_path, low_memory=False)
+    file_name = uploaded_file.name.lower()
+    
+    if file_name.endswith('.zip'):
+        with zipfile.ZipFile(uploaded_file) as z:
+            csv_files = [f for f in z.namelist() if f.endswith('.csv') and not f.startswith('__MACOSX')]
+            if csv_files:
+                with z.open(csv_files[0]) as f:
+                    return pd.read_csv(f, low_memory=False)
+    elif file_name.endswith('.parquet'):
+        return pd.read_parquet(uploaded_file)
+    elif file_name.endswith('.csv'):
+        return pd.read_csv(uploaded_file, low_memory=False)
+    elif file_name.endswith('.xlsx') or file_name.endswith('.xls'):
+        return pd.read_excel(uploaded_file)
+    return None
 
 @st.cache_data(max_entries=5, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
     if os.path.exists('34수송_9월1주차_CSV.csv'):
-        df_iss = load_optimized_csv('34수송_9월1주차_CSV.csv')
+        df_iss = pd.read_csv('34수송_9월1주차_CSV.csv', low_memory=False)
     elif os.path.exists('Ticketing-test_2.csv'):
-        df_iss = load_optimized_csv('Ticketing-test_2.csv')
+        df_iss = pd.read_csv('Ticketing-test_2.csv', low_memory=False)
         
     if os.path.exists('가중치 파일.csv'):
-        df_wt = load_optimized_csv('가중치 파일.csv')
+        df_wt = pd.read_csv('가중치 파일.csv', low_memory=False)
         
     if os.path.exists('공급_9월1주차_CSV.csv'):
-        df_sup = load_optimized_csv('공급_9월1주차_CSV.csv')
+        df_sup = pd.read_csv('공급_9월1주차_CSV.csv', low_memory=False)
     elif os.path.exists('공급 (9월 1주).csv'):
-        df_sup = load_optimized_csv('공급 (9월 1주).csv')
+        df_sup = pd.read_csv('공급 (9월 1주).csv', low_memory=False)
     elif os.path.exists('공급.xlsx'):
         df_sup = pd.read_excel('공급.xlsx', sheet_name='공급_RAW')
         
     if os.path.exists('6TRF TEST.csv'):
-        df_6th = load_optimized_csv('6TRF TEST.csv')
+        df_6th = pd.read_csv('6TRF TEST.csv', low_memory=False)
     elif os.path.exists('6th_freedom.csv'):
-        df_6th = load_optimized_csv('6th_freedom.csv')
+        df_6th = pd.read_csv('6th_freedom.csv', low_memory=False)
         
     return df_iss, df_wt, df_sup, df_6th
 
 disk_iss, disk_wt, disk_sup, disk_6th = load_data_from_disk()
 
-df_iss_raw = load_optimized_csv(uploaded_iss) if uploaded_iss else disk_iss
-df_wt_raw = load_optimized_csv(uploaded_wt) if uploaded_wt else disk_wt
-
-if uploaded_sup:
-    df_sup_raw = load_optimized_csv(uploaded_sup) if uploaded_sup.name.endswith('.csv') else pd.read_excel(uploaded_sup)
-else:
-    df_sup_raw = disk_sup
-
-if uploaded_6th:
-    df_6th_raw = load_optimized_csv(uploaded_6th) if uploaded_6th.name.endswith('.csv') else pd.read_excel(uploaded_6th)
-else:
-    df_6th_raw = disk_6th if disk_6th is not None else df_iss_raw
+df_iss_raw = load_smart_file(uploaded_iss) if uploaded_iss else disk_iss
+df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
+df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
+df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
 
 # Header Notice
 st.title("✈️ 항공사 노선별 통합 M/S 분석 대시보드")
@@ -460,7 +470,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "📋 Raw Data View"])
+        tab1, tab2, tab3 = st.tabs(["📈 시각화 분석 차트", "📊 M/S 피벗 테이블", "🔒 Raw Data View (관리자 전용)"])
         with tab1:
             st.subheader("📊 발매 M/S")
             if not filtered_df.empty:
@@ -502,7 +512,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 3. 발매 주차별 항공사별 발매량 (주차 필터 독립)
                 if week_col and week_col in merged_df.columns:
                     st.subheader("📅 주차별 발매 실적 추이")
                     
@@ -557,7 +566,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown("---")
                 c3, c4, c5 = st.columns(3)
                 
-                # 4. BOUND별 점유비 (BOUND 필터 독립)
                 with c3:
                     if bound_col:
                         mask_no_bound = filter_mask.copy()
@@ -576,7 +584,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         apply_bottom_legend(fig3)
                         st.plotly_chart(fig3, width="stretch")
 
-                # 5. TRIP TYPE별 점유비 (TRIP TYPE 필터 독립)
                 with c4:
                     if 'Ticket Type' in merged_df.columns:
                         mask_no_tt = filter_mask.copy()
@@ -592,7 +599,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         apply_bottom_legend(fig4)
                         st.plotly_chart(fig4, width="stretch")
 
-                # 6. 판매 채널별 점유비 (판매채널 필터 독립)
                 with c5:
                     if channel_col:
                         mask_no_chan = filter_mask.copy()
@@ -624,8 +630,27 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.dataframe(piv_r_ms.map(lambda x: f"{x:.1f}%"), width="stretch")
 
         with tab3:
-            st.markdown("*(속도 최적화를 위해 상위 1,000건만 조율 표출합니다)*")
-            st.dataframe(filtered_df.head(1000), width="stretch")
+            st.subheader("🔒 관리자 전용 Raw Data 조회 및 다운로드")
+            admin_pw = st.text_input("🔑 관리자 비밀번호를 입력하세요:", type="password", key="admin_pw_input")
+            
+            if admin_pw == "1234":
+                st.success("✅ 관리자 인증이 완료되었습니다.")
+                
+                csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    label="📥 필터링된 Raw Data (CSV) 다운로드",
+                    data=csv_data,
+                    file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+                
+                st.markdown("*(상위 1,000건 표출)*")
+                st.dataframe(filtered_df.head(1000), width="stretch")
+            else:
+                if admin_pw:
+                    st.error("❌ 비밀번호가 올바르지 않습니다. 관리자 권한이 필요합니다.")
+                else:
+                    st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     else:
         # ==========================================
@@ -728,7 +753,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if not filtered_sup.empty:
             sup_al_order = [al for al in sup_airlines if al in filtered_sup['Airline'].unique()]
             
-            cs1, cs2 = st.columns([1, 1.1])
+            cs1, cs2 = st.columns([1, 1.2])
             with cs1:
                 pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
                 fig_s1 = px.pie(
@@ -745,13 +770,33 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown("##### 2. 항공사별 공급 실적 및 M/S 요약 (Pivot Table)")
                 pie_sup_al['공급 M/S (%)'] = (pie_sup_al[target_val] / pie_sup_al[target_val].sum()) * 100
                 pie_sup_al = pie_sup_al.sort_values(by=target_val, ascending=False).reset_index(drop=True)
+                pie_sup_al.index = range(1, len(pie_sup_al) + 1)
                 
-                pie_sup_al_disp = pie_sup_al.copy()
-                pie_sup_al_disp.columns = ['항공사', f'공급 실적 ({metric_mode.split()[0]})', '공급 M/S (%)']
-                pie_sup_al_disp[f'공급 실적 ({metric_mode.split()[0]})'] = pie_sup_al_disp[f'공급 실적 ({metric_mode.split()[0]})'].map(lambda x: f"{x:,.0f}")
-                pie_sup_al_disp['공급 M/S (%)'] = pie_sup_al_disp['공급 M/S (%)'].map(lambda x: f"{x:.1f}%")
+                sup_pivot_html = '<div class="yoy-table-container"><table class="yoy-table">'
+                sup_pivot_html += '<thead><tr>'
+                sup_pivot_html += '<th class="mkt-header" style="width:60px;">순위</th>'
+                sup_pivot_html += '<th class="carrier-header">항공사</th>'
+                sup_pivot_html += f'<th class="carrier-header">공급 실적 ({metric_mode.split()[0]})</th>'
+                sup_pivot_html += '<th class="mkt-header">공급 M/S (%)</th>'
+                sup_pivot_html += '</tr></thead><tbody>'
 
-                st.dataframe(pie_sup_al_disp, width="stretch", height=380)
+                for rank_idx, row in pie_sup_al.iterrows():
+                    al_name = str(row['Airline'])
+                    s_val = row[target_val]
+                    s_ms = row['공급 M/S (%)']
+                    
+                    is_ke = (al_name == 'KE')
+                    row_style = ' class="ke-row"' if is_ke else ''
+                    
+                    sup_pivot_html += f'<tr{row_style}>'
+                    sup_pivot_html += f'<td><b>{rank_idx}위</b></td>'
+                    sup_pivot_html += f'<td style="font-weight:700;">{"★ KE" if is_ke else al_name}</td>'
+                    sup_pivot_html += f'<td><b>{s_val:,.0f}</b></td>'
+                    sup_pivot_html += f'<td><b>{s_ms:.1f}%</b></td>'
+                    sup_pivot_html += '</tr>'
+
+                sup_pivot_html += '</tbody></table></div>'
+                st.markdown(sup_pivot_html, unsafe_allow_html=True)
 
             st.markdown("---")
             cs3, cs4 = st.columns(2)
@@ -780,13 +825,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.plotly_chart(fig_s4, width="stretch")
 
             st.markdown("---")
-            
-            # -------------------------------------------------------------
-            # 📌 타임라인 차트 개선 (제목 변경 & 필터 연동/안내문 표출)
-            # -------------------------------------------------------------
             st.subheader("✈️ 항공사별 스케줄 타임라인")
             
-            # 선택된 노선 확인 (전체 ALL_OPTION 여부 체킹)
             is_all_selected = (set(selected_sup_routes) == set(sup_routes)) or (ALL_OPTION in selected_sup_routes)
             
             if is_all_selected:
@@ -866,7 +906,6 @@ else:
     al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Airline'
     od_col_6 = actual_cols['OD ON/OFF'] if actual_cols['OD ON/OFF'] else '노선'
 
-    # 📌 항공사 정렬: KE 맨 위, 나머지는 발매량 높은 순서
     if al_col_6 in df_6.columns:
         al_order_6th = df_6.groupby(al_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
         if 'KE' in al_order_6th:
@@ -881,17 +920,6 @@ else:
     st.sidebar.header("🔍 6수송 대시보드 필터")
     
     with st.sidebar.form("filter_6th_form"):
-        def create_6th_month_multiselect(label, col_key):
-            actual_c = actual_cols[col_key]
-            if actual_c and actual_c in df_6.columns:
-                all_vals = sorted([str(x) for x in df_6[actual_c].dropna().unique()])
-                y26_vals = [m for m in all_vals if '2026' in m or '26년' in m or m.startswith('26.') or m.startswith('2026.')]
-                if not y26_vals: y26_vals = all_vals
-                opts = [ALL_OPTION] + y26_vals
-                selected = st.multiselect(f"{label}", options=opts, default=[ALL_OPTION])
-                return y26_vals if ALL_OPTION in selected or not selected else selected
-            return []
-
         def create_6th_multiselect(label, col_key):
             actual_c = actual_cols[col_key]
             if actual_c and actual_c in df_6.columns:
@@ -908,12 +936,13 @@ else:
                 return sorted_6th_airlines if selected == ALL_OPTION else [selected]
             return []
 
-        f_month = create_6th_month_multiselect("1. TRIP MONTH (26년 출발월)", 'TRIP MONTH')
-        f_region = create_6th_multiselect("2. OD REGION", 'OD REGION')
-        f_al = create_6th_selectbox_al("3. 항공사 (KE 최우선)")
-        f_dir = create_6th_multiselect("4. DIRECTION", 'DIRECTION')
-        f_stop = create_6th_multiselect("5. STOP OVER", 'STOP OVER')
-        f_od = create_6th_multiselect("6. OD ON/OFF", 'OD ON/OFF')
+        f_month = create_6th_multiselect("1. TRIP MONTH", 'TRIP MONTH')
+        f_dir = create_6th_multiselect("2. DIRECTION", 'DIRECTION')
+        f_stop = create_6th_multiselect("3. STOP OVER", 'STOP OVER')
+        f_region = create_6th_multiselect("4. OD REGION", 'OD REGION')
+        f_od = create_6th_multiselect("5. O&D On/Off", 'OD ON/OFF')
+        f_al = create_6th_selectbox_al("6. 항공사 (KE 최우선)")
+        
         f_ori_cntry = create_6th_multiselect("7. TRIP ORIGIN COUNTRY", 'TRIP ORIGIN COUNTRY')
         f_jp_apo = create_6th_multiselect("8. 일본 APO", '일본 APO')
         f_dst_cntry = create_6th_multiselect("9. TRIP DSTN COUNTRY", 'TRIP DSTN COUNTRY')
@@ -921,27 +950,21 @@ else:
 
         st.form_submit_button("🚀 6수송 필터 적용하기")
 
-    month_c = actual_cols['TRIP MONTH']
     mask_6_base = pd.Series(True, index=df_6.index)
     
-    field_filters_non_month = [
-        ('OD REGION', f_region), ('DIRECTION', f_dir), ('STOP OVER', f_stop),
-        ('OD ON/OFF', f_od), ('TRIP ORIGIN COUNTRY', f_ori_cntry), ('일본 APO', f_jp_apo),
-        ('TRIP DSTN COUNTRY', f_dst_cntry), ('해외 APO', f_ov_apo), ('항공사', f_al)
+    field_filters = [
+        ('TRIP MONTH', f_month), ('DIRECTION', f_dir), ('STOP OVER', f_stop),
+        ('OD REGION', f_region), ('OD ON/OFF', f_od), ('항공사', f_al),
+        ('TRIP ORIGIN COUNTRY', f_ori_cntry), ('일본 APO', f_jp_apo),
+        ('TRIP DSTN COUNTRY', f_dst_cntry), ('해외 APO', f_ov_apo)
     ]
 
-    for key, filter_vals in field_filters_non_month:
+    for key, filter_vals in field_filters:
         act_c = actual_cols[key]
-        if act_c and filter_vals:
+        if act_c and act_c in df_6.columns and filter_vals:
             mask_6_base &= (df_6[act_c].astype(str).isin(filter_vals))
 
-    if month_c and month_c in df_6.columns and f_month:
-        mask_cy = mask_6_base & (df_6[month_c].astype(str).isin(f_month))
-        filtered_6 = df_6[mask_cy].copy()
-        if filtered_6.empty:
-            filtered_6 = df_6[mask_6_base].copy()
-    else:
-        filtered_6 = df_6[mask_6_base].copy()
+    filtered_6 = df_6[mask_6_base].copy()
 
     c6_1, c6_2, c6_3 = st.columns(3)
     tot_6_val = filtered_6['Val_num'].sum()
@@ -970,9 +993,6 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # ------------------------------------------
-    # TAB 1: 📊 O&D별 종합 M/S 분석 (KE 열 강조)
-    # ------------------------------------------
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
@@ -1069,20 +1089,15 @@ else:
             apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
-    # ------------------------------------------
-    # TAB 2: 📌 Carrier별 M/S (TOP 30 O&D 버그 수정 완료)
-    # ------------------------------------------
     with tab6_2:
         st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
         if not filtered_6.empty and od_col_6 in filtered_6.columns and al_col_6 in filtered_6.columns:
             
-            # 비교 항공사 드롭다운 목록 (KE 제외, 발매량 순 정렬)
             available_carriers = [c for c in sorted_6th_airlines if c != 'KE']
             col_c1, _ = st.columns([2, 2])
             with col_c1:
                 selected_carrier = st.selectbox("📌 비교분석할 항공사를 지정하세요:", options=available_carriers if available_carriers else sorted_6th_airlines)
 
-            # TOP 30 O&D 추출
             od_totals = filtered_6.groupby(od_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
             od_totals = od_totals.sort_values(by='Val_num', ascending=False).head(30)
             top_od_list = [str(x) for x in od_totals[od_col_6].tolist()]
