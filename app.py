@@ -298,34 +298,39 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df['노선'] = df['노선'].astype(str).str.strip()
 
         # -------------------------------------------------------------
-        # 항공사별 가중치 추정 및 1.0 최대치 제한(Max 1.0 Clip) 로직
+        # 비율(Weight)의 역수(1 / Ratio) 계산 및 100%(1.0) 예외 처리
         # -------------------------------------------------------------
         df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
-        df_wt['Weight_num'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
+        df_wt['Weight_ratio'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
         
         wt_col_route = 'Route Code' if 'Route Code' in df_wt.columns else ('노선' if '노선' in df_wt.columns else df_wt.columns[0])
         wt_col_al = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in df_wt.columns else ('항공사' if '항공사' in df_wt.columns else df_wt.columns[1])
 
-        df_wt_subset = df_wt[[wt_col_route, wt_col_al, 'Weight_num']].dropna(subset=[wt_col_route, wt_col_al])
+        df_wt_subset = df_wt[[wt_col_route, wt_col_al, 'Weight_ratio']].dropna(subset=[wt_col_route, wt_col_al])
         df_wt_subset['Route Code'] = df_wt_subset[wt_col_route].astype(str).str.strip()
         df_wt_subset['Dominant Marketing Airline'] = df_wt_subset[wt_col_al].astype(str).str.strip()
 
-        # 노선별 평균 가중치 산출 (AVERAGEIF)
-        route_avg_weights = df_wt_subset.groupby('Route Code', observed=False)['Weight_num'].mean().to_dict()
+        # 노선별 평균 발매비율 산출 (AVERAGEIF)
+        route_avg_ratios = df_wt_subset.groupby('Route Code', observed=False)['Weight_ratio'].mean().to_dict()
 
         # 1차 VLOOKUP 매칭
         merged_df = pd.merge(
-            df, df_wt_subset[['Route Code', 'Dominant Marketing Airline', 'Weight_num']],
+            df, df_wt_subset[['Route Code', 'Dominant Marketing Airline', 'Weight_ratio']],
             left_on=['노선', 'Dominant Marketing Airline'],
             right_on=['Route Code', 'Dominant Marketing Airline'],
             how='left'
         )
 
-        # 2차 Fallback & 가중치 최대치(1.0) 제어 적용
-        merged_df['Weight_num'] = merged_df['Weight_num'].fillna(merged_df['노선'].map(route_avg_weights)).fillna(1.0)
+        # 2차 Fallback (AVERAGEIF 대체)
+        merged_df['Weight_ratio'] = merged_df['Weight_ratio'].fillna(merged_df['노선'].map(route_avg_ratios)).fillna(1.0)
         
-        # 📌 핵심: 가중치가 1.0을 넘지 않도록 최대 1.0으로 수정 적용
-        merged_df['Weight_num'] = np.minimum(merged_df['Weight_num'], 1.0)
+        # 📌 핵심: 100%(1.0) 이상이면 1.0, 미만이면 역수(1 / 비율)를 곱해주는 가중치 계산 함수
+        def convert_to_reciprocal_weight(ratio):
+            if pd.isna(ratio) or ratio <= 0 or ratio >= 1.0:
+                return 1.0
+            return 1.0 / ratio
+
+        merged_df['Weight_num'] = merged_df['Weight_ratio'].apply(convert_to_reciprocal_weight)
 
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
 
