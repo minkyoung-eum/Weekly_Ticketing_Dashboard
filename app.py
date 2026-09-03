@@ -7,21 +7,6 @@ import datetime
 import os
 import zipfile
 
-# 1. Streamlit 테마 및 파일 업로드 용량 제한 설정 (1000MB로 확장)
-os.makedirs(".streamlit", exist_ok=True)
-config_path = os.path.join(".streamlit", "config.toml")
-with open(config_path, "w", encoding="utf-8") as f:
-    f.write("""[theme]
-primaryColor = "#0ea5e9"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f8fafc"
-textColor = "#0f172a"
-font = "sans serif"
-
-[server]
-maxUploadSize = 1000
-""")
-
 # Page Config
 st.set_page_config(
     page_title="항공사 노선별 통합 M/S 분석 대시보드 (3/4수송 & 6수송)",
@@ -105,7 +90,6 @@ st.markdown("""
         padding: 2px 6px;
         border-radius: 4px;
     }
-    /* 필터 영역 시각화 및 선택값 구분 강조 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 2px solid #0ea5e9 !important;
@@ -204,7 +188,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Sidebar File Uploader Section (ZIP, CSV, XLSX, PARQUET 지원)
+# Sidebar File Uploader Section
 st.sidebar.header("📁 데이터 파일 업로드")
 
 uploaded_iss = st.sidebar.file_uploader("1. 발매/3/4수송 데이터 (CSV, ZIP)", type=['csv', 'zip', 'parquet'])
@@ -212,7 +196,6 @@ uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['
 uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
-# ZIP/CSV/Parquet 범용 로더 지원
 @st.cache_data(max_entries=5, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
@@ -276,7 +259,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 상단 대시보드 구조 재편 (3/4수송 vs 6수송 별도 구분)
+# 상단 대시보드 구조 재편
 # -------------------------------------------------------------
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 selected_group = st.radio(
