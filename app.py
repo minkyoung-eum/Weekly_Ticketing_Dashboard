@@ -297,20 +297,50 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df['노선'] = df['노선'].astype(str).str.strip()
 
+        # -------------------------------------------------------------
+        # 항공사별 수식 기반 가중치 추정 로직 (IFERROR + AVERAGEIF)
+        # -------------------------------------------------------------
         df_wt['Weight_clean'] = df_wt['Weight'].astype(str).str.replace('%', '').str.strip()
         df_wt['Weight_num'] = pd.to_numeric(df_wt['Weight_clean'], errors='coerce') / 100.0
-        df_wt_subset = df_wt[['Route Code', 'Dominant Marketing Airline', 'Weight_num']].dropna(subset=['Route Code', 'Dominant Marketing Airline'])
-        df_wt_subset['Route Code'] = df_wt_subset['Route Code'].astype(str).str.strip()
+        
+        wt_col_route = 'Route Code' if 'Route Code' in df_wt.columns else ('노선' if '노선' in df_wt.columns else df_wt.columns[0])
+        wt_col_al = 'Dominant Marketing Airline' if 'Dominant Marketing Airline' in df_wt.columns else ('항공사' if '항공사' in df_wt.columns else df_wt.columns[1])
 
+        df_wt_subset = df_wt[[wt_col_route, wt_col_al, 'Weight_num']].dropna(subset=[wt_col_route, wt_col_al])
+        df_wt_subset['Route Code'] = df_wt_subset[wt_col_route].astype(str).str.strip()
+        df_wt_subset['Dominant Marketing Airline'] = df_wt_subset[wt_col_al].astype(str).str.strip()
+
+        # 노선별 평균 가중치 산출 (AVERAGEIF 연산)
+        route_avg_weights = df_wt_subset.groupby('Route Code', observed=False)['Weight_num'].mean().to_dict()
+
+        # 1차 VLOOKUP 매칭 (항공사+노선)
         merged_df = pd.merge(
-            df, df_wt_subset,
+            df, df_wt_subset[['Route Code', 'Dominant Marketing Airline', 'Weight_num']],
             left_on=['노선', 'Dominant Marketing Airline'],
             right_on=['Route Code', 'Dominant Marketing Airline'],
             how='left'
         )
-        merged_df['Weight_num'] = merged_df['Weight_num'].fillna(1.0)
+
+        # 2차 Fallback: 누락된 데이터는 노선 평균 가중치(AVERAGEIF)로 보정
+        merged_df['Weight_num'] = merged_df['Weight_num'].fillna(merged_df['노선'].map(route_avg_weights)).fillna(1.0)
+        
         merged_df['Value'] = pd.to_numeric(merged_df['Value'], errors='coerce').fillna(0)
-        merged_df['Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
+
+        # -------------------------------------------------------------
+        # 항공사별 정규화 가중치 연산 (SUMPRODUCT 분모 처리)
+        # SUMPRODUCT(Value_i * Weight_i)
+        # -------------------------------------------------------------
+        merged_df['Raw_Weighted_Value'] = merged_df['Value'] * merged_df['Weight_num']
+        
+        # 노선별 SUMPRODUCT 분모 계산
+        route_sumproduct = merged_df.groupby('노선', observed=False)['Raw_Weighted_Value'].transform('sum')
+        route_raw_sum = merged_df.groupby('노선', observed=False)['Value'].transform('sum')
+
+        # 가중 비중 분율 = (Value * Weight) / SUMPRODUCT(Value * Weight)
+        merged_df['Weighted_Ratio'] = np.where(route_sumproduct > 0, merged_df['Raw_Weighted_Value'] / route_sumproduct, 0)
+        
+        # 가중 실적 = 노선 전체 Raw 발매량 * 가중 비중 분율
+        merged_df['Weighted_Value'] = merged_df['Weighted_Ratio'] * route_raw_sum
 
         week_col = '발매 주차' if '발매 주차' in merged_df.columns else ('발매주차' if '발매주차' in merged_df.columns else ('Issue Week' if 'Issue Week' in merged_df.columns else None))
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
@@ -341,7 +371,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-        # 토글 상태에 따라 동일하게 정렬된 노선 순서
+        # 스위치 상태에 맞춰 노선 내림차순 정렬
         full_route_sum = merged_df.groupby('노선', observed=False)[val_col].sum().sort_values(ascending=False)
         route_order_list = [str(x) for x in full_route_sum.index.tolist()]
 
