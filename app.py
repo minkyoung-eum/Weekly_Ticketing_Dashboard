@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# CSS Styling (스카이블루 #0ea5e9 고정)
+# CSS Styling
 st.markdown("""
 <style>
     :root {
@@ -67,6 +67,13 @@ st.markdown("""
     
     div[data-testid="stToggle"] input:checked + div {
         background-color: #0ea5e9 !important;
+    }
+
+    div[data-baseweb="select"] span[data-baseweb="tag"],
+    div[data-baseweb="tag"] {
+        background-color: transparent !important;
+        background: transparent !important;
+        box-shadow: none !important;
     }
 
     div[data-baseweb="select"] {
@@ -255,7 +262,6 @@ uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['
 uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
-# 📌 메모리 점유율을 80% 줄여주는 경량화 함수
 def optimize_df(df_in):
     if df_in is None:
         return None
@@ -270,7 +276,7 @@ def optimize_df(df_in):
             df_in[col] = df_in[col].astype('float32')
     return df_in
 
-@st.cache_data(max_entries=1, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
         return None
@@ -290,7 +296,7 @@ def load_smart_file(uploaded_file):
         return optimize_df(pd.read_excel(uploaded_file))
     return None
 
-@st.cache_data(max_entries=1, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
     if os.path.exists('34수송_9월1주차_CSV_2.csv'):
@@ -324,8 +330,7 @@ df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
 
-# 📌 OOM 방지 캐싱 전처리 함수
-@st.cache_data(max_entries=1, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def process_iss_merged(df_iss, df_wt):
     if df_iss is None or df_wt is None:
         return None
@@ -611,7 +616,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         week_totals_dict = dict(zip(week_totals[week_col].astype(str), week_totals[val_col]))
 
                         week_al_grp['Week_Total'] = week_al_grp[week_col].map(week_totals_dict)
-                        week_al_grp['MS_Percent'] = np.where(week_al_grp['Week_Total'] > 0, (week_al_grp[val_col] / week_al_grp['Week_Total']) * 100, 0)
+                        
+                        week_tot_num = pd.to_numeric(week_al_grp['Week_Total'], errors='coerce').fillna(0)
+                        val_col_num = pd.to_numeric(week_al_grp[val_col], errors='coerce').fillna(0)
+                        week_al_grp['MS_Percent'] = np.where(week_tot_num > 0, (val_col_num / week_tot_num) * 100, 0)
                         week_al_grp['Text_Display'] = week_al_grp['MS_Percent'].map(lambda x: f"{x:.1f}%" if x >= 3.0 else "")
 
                         fig_week = px.bar(
@@ -1187,8 +1195,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             observed=False
                         )
                         piv_grp_single['총합계'] = piv_grp_single.sum(axis=1)
-                        # 📌 렌더링 부하 방지를 위해 상위 100개 대리점 표출
-                        piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(100)
+                        # 📌 요청반영: 상위 50개 대리점만 표출
+                        piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(50)
 
                         g_html = '<div class="yoy-table-container"><table class="yoy-table">'
                         g_html += '<thead><tr><th class="mkt-header" style="width:220px; text-align:left; padding-left:12px;">대리점명 (DEP DATE)</th>'
@@ -1219,7 +1227,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드
+# GROUP 2: 🌐 6수송 대시보드 (2026년 금년 데이터 집중 필터링 적용)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1230,11 +1238,11 @@ else:
     df_6 = df_6th_raw.copy()
     
     col_map_6th = {
-        'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 '],
+        'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 ', 'Trip Month'],
         'OD REGION': ['OD REGION', 'Region', 'OD 권역'],
         'DIRECTION': ['DIRECTION', 'Bound', 'Direction'],
         'STOP OVER': ['STOP OVER', 'Stopover', 'Stops'],
-        'OD ON/OFF': ['OD ON/OFF', 'OD', 'OD Pair', '노선'],
+        'OD ON/OFF': ['OD ON/OFF', 'OD', 'OD Pair', '노선', 'O&D ON/OFF'],
         'TRIP ORIGIN COUNTRY': ['TRIP ORIGIN COUNTRY', 'Origin Country / Subregion', 'Origin Country'],
         '일본 APO': ['일본 APO', 'Japan Airport', 'Origin Code', 'Destination Code'],
         'TRIP DSTN COUNTRY': ['TRIP DSTN COUNTRY', 'Destination Country / Subregion', 'Destination Country'],
@@ -1252,18 +1260,27 @@ else:
     for key, p_list in col_map_6th.items():
         actual_cols[key] = get_actual_col(df_6, p_list)
 
-    val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else 'Flights')
+    val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else ('Flights' if 'Flights' in df_6.columns else df_6.columns[-1]))
     py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
 
-    df_6['Val_num'] = pd.to_numeric(df_6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(1) if val_col_6 in df_6.columns else 1
+    df_6['Val_num'] = pd.to_numeric(df_6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     
     if py_col_6 and py_col_6 in df_6.columns:
         df_6['Val_PY_num'] = pd.to_numeric(df_6[py_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     else:
         df_6['Val_PY_num'] = df_6['Val_num'] * 0.95
 
-    al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Airline'
+    al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Dominant Marketing Airline'
     od_col_6 = actual_cols['OD ON/OFF'] if actual_cols['OD ON/OFF'] else '노선'
+    month_col_6 = actual_cols['TRIP MONTH'] if actual_cols['TRIP MONTH'] else 'TRIP MONTH'
+
+    # 📌 6수송 데이터 2026년(금년) 집중 추출 및 과집계 방지
+    if month_col_6 in df_6.columns:
+        all_6_months = sorted([str(x) for x in df_6[month_col_6].dropna().unique()])
+        months_2026 = [m for m in all_6_months if '2026' in m or '26' in m]
+        valid_6_months = months_2026 if months_2026 else all_6_months
+    else:
+        valid_6_months = []
 
     if al_col_6 in df_6.columns:
         al_order_6th = df_6.groupby(al_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
@@ -1275,14 +1292,14 @@ else:
     else:
         sorted_6th_airlines = []
 
-    with st.expander("🔍 **6수송 대시보드 검색 & 드롭다운 필터 설정** (클릭하여 여닫기)", expanded=True):
+    with st.expander("🔍 **6수송 대시보드 검색 & 드롭다운 필터 설정** (2026년 금년 기준)", expanded=True):
         with st.form("filter_6th_form_top"):
             c6_f1, c6_f2, c6_f3, c6_f4 = st.columns(4)
             
-            def create_6th_dropdown(col_obj, label, col_key):
+            def create_6th_dropdown(col_obj, label, col_key, custom_list=None):
                 actual_c = actual_cols[col_key]
                 if actual_c and actual_c in df_6.columns:
-                    unique_vals = sorted([str(x) for x in df_6[actual_c].dropna().unique()])
+                    unique_vals = custom_list if custom_list is not None else sorted([str(x) for x in df_6[actual_c].dropna().unique()])
                     opts = [ALL_OPTION] + unique_vals
                     selected = col_obj.selectbox(f"{label}", options=opts, index=0)
                     return unique_vals if selected == ALL_OPTION else [selected]
@@ -1295,7 +1312,7 @@ else:
                     return sorted_6th_airlines if selected == ALL_OPTION else [selected]
                 return []
 
-            f_month = create_6th_dropdown(c6_f1, "1. TRIP MONTH", 'TRIP MONTH')
+            f_month = create_6th_dropdown(c6_f1, "1. TRIP MONTH (2026년)", 'TRIP MONTH', custom_list=valid_6_months)
             f_dir = create_6th_dropdown(c6_f2, "2. DIRECTION", 'DIRECTION')
             f_stop = create_6th_dropdown(c6_f3, "3. STOP OVER", 'STOP OVER')
             f_region = create_6th_dropdown(c6_f4, "4. OD REGION", 'OD REGION')
@@ -1314,8 +1331,12 @@ else:
 
     mask_6_base = pd.Series(True, index=df_6.index)
     
+    # 기본 2026년월 필터링 적용 (과집계 차단)
+    if month_col_6 in df_6.columns and f_month:
+        mask_6_base &= df_6[month_col_6].astype(str).isin(f_month)
+
     field_filters = [
-        ('TRIP MONTH', f_month), ('DIRECTION', f_dir), ('STOP OVER', f_stop),
+        ('DIRECTION', f_dir), ('STOP OVER', f_stop),
         ('OD REGION', f_region), ('OD ON/OFF', f_od), ('항공사', f_al),
         ('TRIP ORIGIN COUNTRY', f_ori_cntry), ('일본 APO', f_jp_apo),
         ('TRIP DSTN COUNTRY', f_dst_cntry), ('해외 APO', f_ov_apo)
@@ -1451,6 +1472,7 @@ else:
             apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
+    # 📌 CARRIER별 M/S (TOP 30 O&D 상세) 테이블 로직 보완
     with tab6_2:
         st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
         if not filtered_6.empty and od_col_6 in filtered_6.columns and al_col_6 in filtered_6.columns:
@@ -1460,102 +1482,108 @@ else:
             with col_c1:
                 selected_carrier = st.selectbox("📌 비교분석할 항공사를 지정하세요:", options=available_carriers if available_carriers else sorted_6th_airlines)
 
-            od_totals = filtered_6.groupby(od_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
+            # O&D 발매량 합계 기준 상위 30개 자동 추출
+            od_totals = filtered_6.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
             od_totals = od_totals.sort_values(by='Val_num', ascending=False).head(30)
-            top_od_list = [str(x) for x in od_totals[od_col_6].tolist()]
+            top_od_list = [str(x) for x in od_totals[od_col_6].tolist() if pd.notnull(x)]
 
             df_top = filtered_6[filtered_6[od_col_6].astype(str).isin(top_od_list)].copy()
 
-            carrier_html = '<div class="yoy-table-container"><table class="yoy-table">'
-            carrier_html += '<thead><tr>'
-            carrier_html += '<th class="mkt-header" style="width:40px;" rowspan="2">순위</th>'
-            carrier_html += '<th class="mkt-header" style="width:130px;" rowspan="2">TOP O&D</th>'
-            carrier_html += '<th class="mkt-header" colspan="3">시장 전체</th>'
-            carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 발매량 ({selected_carrier})</th>'
-            carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 M/S ({selected_carrier})</th>'
-            carrier_html += '<th class="ke-header" colspan="3">KE 발매량</th>'
-            carrier_html += '<th class="ke-header" colspan="3">KE M/S</th>'
-            carrier_html += '</tr><tr>'
-            carrier_html += '<th class="mkt-header">26년</th><th class="mkt-header">25년</th><th class="mkt-header">YOY</th>'
-            carrier_html += '<th class="carrier-header">26년</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
-            carrier_html += '<th class="carrier-header">M/S</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
-            carrier_html += '<th class="ke-header">26년</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
-            carrier_html += '<th class="ke-header">M/S</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
-            carrier_html += '</tr></thead><tbody>'
+            if not df_top.empty and top_od_list:
+                carrier_html = '<div class="yoy-table-container"><table class="yoy-table">'
+                carrier_html += '<thead><tr>'
+                carrier_html += '<th class="mkt-header" style="width:40px;" rowspan="2">순위</th>'
+                carrier_html += '<th class="mkt-header" style="width:130px;" rowspan="2">TOP O&D</th>'
+                carrier_html += '<th class="mkt-header" colspan="3">시장 전체</th>'
+                carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 발매량 ({selected_carrier})</th>'
+                carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 M/S ({selected_carrier})</th>'
+                carrier_html += '<th class="ke-header" colspan="3">KE 발매량</th>'
+                carrier_html += '<th class="ke-header" colspan="3">KE M/S</th>'
+                carrier_html += '</tr><tr>'
+                carrier_html += '<th class="mkt-header">26년</th><th class="mkt-header">25년</th><th class="mkt-header">YOY</th>'
+                carrier_html += '<th class="carrier-header">26년</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
+                carrier_html += '<th class="carrier-header">M/S</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
+                carrier_html += '<th class="ke-header">26년</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
+                carrier_html += '<th class="ke-header">M/S</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
+                carrier_html += '</tr></thead><tbody>'
 
-            for idx, od_name in enumerate(top_od_list, start=1):
-                od_sub = df_top[df_top[od_col_6].astype(str) == od_name]
-                
-                m_cy = od_sub['Val_num'].sum()
-                m_py = od_sub['Val_PY_num'].sum()
-                m_yoy = ((m_cy - m_py) / m_py * 100) if m_py > 0 else 0
-                m_yoy_str = f'<span class="yoy-up">▲ {m_yoy:.0f}%</span>' if m_yoy >= 0 else f'<span class="yoy-down">▼ {abs(m_yoy):.0f}%</span>'
+                for idx, od_name in enumerate(top_od_list, start=1):
+                    od_sub = df_top[df_top[od_col_6].astype(str) == od_name]
+                    
+                    m_cy = od_sub['Val_num'].sum()
+                    m_py = od_sub['Val_PY_num'].sum()
+                    m_yoy = ((m_cy - m_py) / m_py * 100) if m_py > 0 else 0
+                    m_yoy_str = f'<span class="yoy-up">▲ {m_yoy:.0f}%</span>' if m_yoy >= 0 else f'<span class="yoy-down">▼ {abs(m_yoy):.0f}%</span>'
 
-                c_sub = od_sub[od_sub[al_col_6].astype(str) == selected_carrier]
-                c_cy = c_sub['Val_num'].sum()
-                c_py = c_sub['Val_PY_num'].sum()
-                c_yoy = ((c_cy - c_py) / c_py * 100) if c_py > 0 else 0
-                c_yoy_str = f'<span class="yoy-up">▲ {c_yoy:.0f}%</span>' if c_yoy >= 0 else f'<span class="yoy-down">▼ {abs(c_yoy):.0f}%</span>'
+                    c_sub = od_sub[od_sub[al_col_6].astype(str) == selected_carrier]
+                    c_cy = c_sub['Val_num'].sum()
+                    c_py = c_sub['Val_PY_num'].sum()
+                    c_yoy = ((c_cy - c_py) / c_py * 100) if c_py > 0 else 0
+                    c_yoy_str = f'<span class="yoy-up">▲ {c_yoy:.0f}%</span>' if c_yoy >= 0 else f'<span class="yoy-down">▼ {abs(c_yoy):.0f}%</span>'
 
-                c_ms_cy = (c_cy / m_cy * 100) if m_cy > 0 else 0
-                c_ms_py = (c_py / m_py * 100) if m_py > 0 else 0
-                c_ms_diff = c_ms_cy - c_ms_py
-                c_ms_diff_str = f'<span class="yoy-up">▲ {c_ms_diff:.0f}%p</span>' if c_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(c_ms_diff):.0f}%p</span>'
+                    c_ms_cy = (c_cy / m_cy * 100) if m_cy > 0 else 0
+                    c_ms_py = (c_py / m_py * 100) if m_py > 0 else 0
+                    c_ms_diff = c_ms_cy - c_ms_py
+                    c_ms_diff_str = f'<span class="yoy-up">▲ {c_ms_diff:.0f}%p</span>' if c_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(c_ms_diff):.0f}%p</span>'
 
-                k_sub = od_sub[od_sub[al_col_6].astype(str) == 'KE']
-                k_cy = k_sub['Val_num'].sum()
-                k_py = k_sub['Val_PY_num'].sum()
-                k_yoy = ((k_cy - k_py) / k_py * 100) if k_py > 0 else 0
-                k_yoy_str = f'<span class="yoy-up">▲ {k_yoy:.0f}%</span>' if k_yoy >= 0 else f'<span class="yoy-down">▼ {abs(k_yoy):.0f}%</span>'
+                    k_sub = od_sub[od_sub[al_col_6].astype(str) == 'KE']
+                    k_cy = k_sub['Val_num'].sum()
+                    k_py = k_sub['Val_PY_num'].sum()
+                    k_yoy = ((k_cy - k_py) / k_py * 100) if k_py > 0 else 0
+                    k_yoy_str = f'<span class="yoy-up">▲ {k_yoy:.0f}%</span>' if k_yoy >= 0 else f'<span class="yoy-down">▼ {abs(k_yoy):.0f}%</span>'
 
-                k_ms_cy = (k_cy / m_cy * 100) if m_cy > 0 else 0
-                k_ms_py = (k_py / m_py * 100) if m_py > 0 else 0
-                k_ms_diff = k_ms_cy - k_ms_py
-                k_ms_diff_str = f'<span class="yoy-up">▲ {k_ms_diff:.1f}%p</span>' if k_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(k_ms_diff):.1f}%p</span>'
+                    k_ms_cy = (k_cy / m_cy * 100) if m_cy > 0 else 0
+                    k_ms_py = (k_py / m_py * 100) if m_py > 0 else 0
+                    k_ms_diff = k_ms_cy - k_ms_py
+                    k_ms_diff_str = f'<span class="yoy-up">▲ {k_ms_diff:.1f}%p</span>' if k_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(k_ms_diff):.1f}%p</span>'
 
-                carrier_html += f'<tr>'
-                carrier_html += f'<td>{idx}</td>'
-                carrier_html += f'<td style="font-weight:600; text-align:left; padding-left:10px;">{od_name}</td>'
-                carrier_html += f'<td><b>{m_cy:,.0f}</b></td><td>{m_py:,.0f}</td><td>{m_yoy_str}</td>'
-                carrier_html += f'<td>{c_cy:,.0f}</td><td>{c_py:,.0f}</td><td>{c_yoy_str}</td>'
-                carrier_html += f'<td><b>{c_ms_cy:.0f}%</b></td><td>{c_ms_py:.0f}%</td><td>{c_ms_diff_str}</td>'
-                k_cy_display = f"{k_cy:,.0f}" if k_cy > 0 else "-"
-                k_py_display = f"{k_py:,.0f}" if k_py > 0 else "-"
-                carrier_html += f'<td class="ke-cell">{k_cy_display}</td><td class="ke-cell">{k_py_display}</td><td class="ke-cell">{k_yoy_str if k_cy>0 or k_py>0 else "-"}</td>'
-                carrier_html += f'<td class="ke-cell"><b>{k_ms_cy:.1f}%</b></td><td class="ke-cell">{k_ms_py:.1f}%</td><td class="ke-cell">{k_ms_diff_str}</td>'
+                    carrier_html += f'<tr>'
+                    carrier_html += f'<td>{idx}</td>'
+                    carrier_html += f'<td style="font-weight:600; text-align:left; padding-left:10px;">{od_name}</td>'
+                    carrier_html += f'<td><b>{m_cy:,.0f}</b></td><td>{m_py:,.0f}</td><td>{m_yoy_str}</td>'
+                    carrier_html += f'<td>{c_cy:,.0f}</td><td>{c_py:,.0f}</td><td>{c_yoy_str}</td>'
+                    carrier_html += f'<td><b>{c_ms_cy:.0f}%</b></td><td>{c_ms_py:.0f}%</td><td>{c_ms_diff_str}</td>'
+                    k_cy_display = f"{k_cy:,.0f}" if k_cy > 0 else "-"
+                    k_py_display = f"{k_py:,.0f}" if k_py > 0 else "-"
+                    carrier_html += f'<td class="ke-cell">{k_cy_display}</td><td class="ke-cell">{k_py_display}</td><td class="ke-cell">{k_yoy_str if k_cy>0 or k_py>0 else "-"}</td>'
+                    carrier_html += f'<td class="ke-cell"><b>{k_ms_cy:.1f}%</b></td><td class="ke-cell">{k_ms_py:.1f}%</td><td class="ke-cell">{k_ms_diff_str}</td>'
+                    carrier_html += '</tr>'
+
+                tot_m_cy = df_top['Val_num'].sum()
+                tot_m_py = df_top['Val_PY_num'].sum()
+                tot_m_yoy = ((tot_m_cy - tot_m_py) / tot_m_py * 100) if tot_m_py > 0 else 0
+
+                tot_c_sub = df_top[df_top[al_col_6].astype(str) == selected_carrier]
+                tot_c_cy = tot_c_sub['Val_num'].sum()
+                tot_c_py = tot_c_sub['Val_PY_num'].sum()
+                tot_c_yoy = ((tot_c_cy - tot_c_py) / tot_c_py * 100) if tot_c_py > 0 else 0
+                tot_c_ms_cy = (tot_c_cy / tot_m_cy * 100) if tot_m_cy > 0 else 0
+                tot_c_ms_py = (tot_c_py / tot_m_py * 100) if tot_m_py > 0 else 0
+                tot_c_ms_diff = tot_c_ms_cy - tot_c_ms_py
+
+                tot_k_sub = df_top[df_top[al_col_6].astype(str) == 'KE']
+                tot_k_cy = tot_k_sub['Val_num'].sum()
+                tot_k_py = tot_k_sub['Val_PY_num'].sum()
+                tot_k_yoy = ((tot_k_cy - tot_k_py) / tot_k_py * 100) if tot_k_py > 0 else 0
+                tot_k_ms_cy = (tot_k_cy / tot_m_cy * 100) if tot_m_cy > 0 else 0
+                tot_k_ms_py = (tot_k_py / tot_m_py * 100) if tot_m_py > 0 else 0
+                tot_k_ms_diff = tot_k_ms_cy - tot_k_ms_py
+
+                carrier_html += '<tr class="row-summary">'
+                carrier_html += '<td colspan="2" style="text-align:center;">TOP 30 요약</td>'
+                carrier_html += f'<td>{tot_m_cy:,.0f}</td><td>{tot_m_py:,.0f}</td><td>{"▲" if tot_m_yoy>=0 else "▼"} {abs(tot_m_yoy):.0f}%</td>'
+                carrier_html += f'<td>{tot_c_cy:,.0f}</td><td>{tot_c_py:,.0f}</td><td>{"▲" if tot_c_yoy>=0 else "▼"} {abs(tot_c_yoy):.0f}%</td>'
+                carrier_html += f'<td>{tot_c_ms_cy:.0f}%</td><td>{tot_c_ms_py:.0f}%</td><td>{"▲" if tot_c_ms_diff>=0 else "▼"} {abs(tot_c_ms_diff):.0f}%p</td>'
+                carrier_html += f'<td class="ke-cell">{tot_k_cy:,.0f}</td><td class="ke-cell">{tot_k_py:,.0f}</td><td class="ke-cell">{"▲" if tot_k_yoy>=0 else "▼"} {abs(tot_k_yoy):.0f}%</td>'
+                carrier_html += f'<td class="ke-cell">{tot_k_ms_cy:.1f}%</td><td class="ke-cell">{tot_k_ms_py:.1f}%</td><td class="ke-cell">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
                 carrier_html += '</tr>'
 
-            tot_m_cy = df_top['Val_num'].sum()
-            tot_m_py = df_top['Val_PY_num'].sum()
-            tot_m_yoy = ((tot_m_cy - tot_m_py) / tot_m_py * 100) if tot_m_py > 0 else 0
-
-            tot_c_sub = df_top[df_top[al_col_6].astype(str) == selected_carrier]
-            tot_c_cy = tot_c_sub['Val_num'].sum()
-            tot_c_py = tot_c_sub['Val_PY_num'].sum()
-            tot_c_yoy = ((tot_c_cy - tot_c_py) / tot_c_py * 100) if tot_c_py > 0 else 0
-            tot_c_ms_cy = (tot_c_cy / tot_m_cy * 100) if tot_m_cy > 0 else 0
-            tot_c_ms_py = (tot_c_py / tot_m_py * 100) if tot_m_py > 0 else 0
-            tot_c_ms_diff = tot_c_ms_cy - tot_c_ms_py
-
-            tot_k_sub = df_top[df_top[al_col_6].astype(str) == 'KE']
-            tot_k_cy = tot_k_sub['Val_num'].sum()
-            tot_k_py = tot_k_sub['Val_PY_num'].sum()
-            tot_k_yoy = ((tot_k_cy - tot_k_py) / tot_k_py * 100) if tot_k_py > 0 else 0
-            tot_k_ms_cy = (tot_k_cy / tot_m_cy * 100) if tot_m_cy > 0 else 0
-            tot_k_ms_py = (tot_k_py / tot_m_py * 100) if tot_m_py > 0 else 0
-            tot_k_ms_diff = tot_k_ms_cy - tot_k_ms_py
-
-            carrier_html += '<tr class="row-summary">'
-            carrier_html += '<td colspan="2" style="text-align:center;">TOP 30 요약</td>'
-            carrier_html += f'<td>{tot_m_cy:,.0f}</td><td>{tot_m_py:,.0f}</td><td>{"▲" if tot_m_yoy>=0 else "▼"} {abs(tot_m_yoy):.0f}%</td>'
-            carrier_html += f'<td>{tot_c_cy:,.0f}</td><td>{tot_c_py:,.0f}</td><td>{"▲" if tot_c_yoy>=0 else "▼"} {abs(tot_c_yoy):.0f}%</td>'
-            carrier_html += f'<td>{tot_c_ms_cy:.0f}%</td><td>{tot_c_ms_py:.0f}%</td><td>{"▲" if tot_c_ms_diff>=0 else "▼"} {abs(tot_c_ms_diff):.0f}%p</td>'
-            carrier_html += f'<td class="ke-cell">{tot_k_cy:,.0f}</td><td class="ke-cell">{tot_k_py:,.0f}</td><td class="ke-cell">{"▲" if tot_k_yoy>=0 else "▼"} {abs(tot_k_yoy):.0f}%</td>'
-            carrier_html += f'<td class="ke-cell">{tot_k_ms_cy:.1f}%</td><td class="ke-cell">{tot_k_ms_py:.1f}%</td><td class="ke-cell">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
-            carrier_html += '</tr>'
-
-            carrier_html += '</tbody></table></div>'
-            st.markdown(carrier_html, unsafe_allow_html=True)
+                carrier_html += '</tbody></table></div>'
+                st.markdown(carrier_html, unsafe_allow_html=True)
+            else:
+                st.warning("선택된 조건의 TOP 30 O&D 데이터가 없습니다.")
+        else:
+            st.warning("6수송 데이터에 O&D 또는 항공사 필드가 존재하지 않습니다.")
 
     with tab6_3:
         st.markdown("*(속도 최적화를 위해 상위 1,000건만 조율 표출합니다)*")
