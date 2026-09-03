@@ -47,25 +47,19 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 붉은색 완전 제거 및 파란색/하늘색(#0ea5e9) 강력 적용 CSS
+# CSS Styling (스카이블루 #0ea5e9 고정)
 st.markdown("""
 <style>
-    /* 전역 CSS 테마 색상 붉은색 강제 제거 및 스카이블루 고정 */
     :root {
         --primary-color: #0ea5e9 !important;
         --primaryColor: #0ea5e9 !important;
     }
     
-    /* Radio, Tab, Toggle 등 활성화 요소 붉은색 제거 */
     div[role="radiogroup"] label div[role="radio"][aria-checked="true"] {
         background-color: #0ea5e9 !important;
         border-color: #0ea5e9 !important;
     }
     
-    div[data-testid="stRadioButton"] label p {
-        color: #0f172a !important;
-    }
-
     button[data-baseweb="tab"][aria-selected="true"] {
         color: #0ea5e9 !important;
         border-bottom-color: #0ea5e9 !important;
@@ -75,15 +69,6 @@ st.markdown("""
         background-color: #0ea5e9 !important;
     }
 
-    /* 드롭다운 Selectbox 테두리 및 포커스 파란색 강조 */
-    div[data-baseweb="select"] {
-        border-color: #cbd5e1 !important;
-    }
-    div[data-baseweb="select"]:focus-within {
-        border-color: #0ea5e9 !important;
-    }
-
-    /* Header 및 메트릭 박스 */
     .source-header-box {
         background-color: #f0f9ff;
         border-left: 5px solid #0284c7;
@@ -138,7 +123,6 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 필터 박스 프레임 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 2px solid #0ea5e9 !important;
@@ -148,7 +132,6 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
-    /* 필터 적용하기 버튼 중앙 정렬 및 파란색 강조 스타일링 */
     div[data-testid="stForm"] button[kind="primaryFormSubmit"], 
     div[data-testid="stForm"] button[type="submit"] {
         display: block !important;
@@ -169,7 +152,6 @@ st.markdown("""
         transform: scale(1.02) !important;
     }
 
-    /* Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -455,16 +437,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 KE 취항 노선 우선 추출 (발매량순)
-        if ke_service_col and '취항' in all_ke_services:
-            ke_only_df = merged_df[merged_df[ke_service_col] == '취항']
-            ke_route_sum = ke_only_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
-            route_order_list = [str(x) for x in ke_route_sum.index.tolist() if str(x) != 'nan']
-        else:
-            full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
-            route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
+        # 📌 전체 노선 목록 (발매량 높은 순)
+        full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
+        route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
-        # 📌 깔끔한 드롭다운(Selectbox) 검색 필터
         with st.expander("🔍 **발매 대시보드 검색 & 드롭다운 필터 설정** (클릭하여 여닫기)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
@@ -477,11 +453,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     selected = col_obj.selectbox(label, options=opts, index=0)
                     return full_list if selected == ALL_OPTION else [selected]
 
-                selected_routes = create_dropdown(f_col1, "1. 노선 (KE취항 / 발매량순)", route_order_list)
+                selected_routes = create_dropdown(f_col1, "1. 노선 (발매량 순 정렬)", route_order_list)
                 selected_weeks = create_dropdown(f_col2, "2. 발매 주차 및 일자", all_issue_weeks) if week_col else []
                 
-                # KE 취항 여부 기본 선택 드롭다운
-                default_ke_idx = 1 if "취항" in all_ke_services else 0
+                # 📌 KE 취항 여부 드롭다운 (기본값: '취항' 선택, 전체 선택 시 0)
+                default_ke_idx = (all_ke_services.index("취항") + 1) if "취항" in all_ke_services else 0
                 selected_ke_val = f_col3.selectbox("3. KE 취항 여부 (기본: 취항)", options=[ALL_OPTION] + all_ke_services, index=default_ke_idx) if ke_service_col else ALL_OPTION
                 selected_ke_services = all_ke_services if selected_ke_val == ALL_OPTION else [selected_ke_val]
 
@@ -777,7 +753,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 selected_sup_routes = create_dropdown_sup(sf_col1, "1. 노선 (공급석 순 정렬)", sup_routes)
                 
-                default_sup_ke_idx = 1 if "취항" in sup_ke_services else 0
+                default_sup_ke_idx = (sup_ke_services.index("취항") + 1) if "취항" in sup_ke_services else 0
                 selected_sup_ke_val = sf_col2.selectbox("2. KE 취항 여부 (기본: 취항)", options=[ALL_OPTION] + sup_ke_services, index=default_sup_ke_idx) if sup_ke_col else ALL_OPTION
                 selected_sup_ke_services = sup_ke_services if selected_sup_ke_val == ALL_OPTION else [selected_sup_ke_val]
 
@@ -948,7 +924,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (RBD Hierarchy 정렬)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -1275,7 +1251,6 @@ else:
     else:
         sorted_6th_airlines = []
 
-    # 📌 깔끔한 드롭다운 검색 필터
     with st.expander("🔍 **6수송 대시보드 검색 & 드롭다운 필터 설정** (클릭하여 여닫기)", expanded=True):
         with st.form("filter_6th_form_top"):
             c6_f1, c6_f2, c6_f3, c6_f4 = st.columns(4)
