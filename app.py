@@ -69,7 +69,13 @@ st.markdown("""
         background-color: #0ea5e9 !important;
     }
 
-    /* Header 및 메트릭 박스 */
+    div[data-baseweb="select"] {
+        border-color: #cbd5e1 !important;
+    }
+    div[data-baseweb="select"]:focus-within {
+        border-color: #0ea5e9 !important;
+    }
+
     .source-header-box {
         background-color: #f0f9ff;
         border-left: 5px solid #0284c7;
@@ -124,7 +130,6 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 필터 박스 프레임 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 2px solid #0ea5e9 !important;
@@ -134,7 +139,6 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
-    /* 📌 필터 적용하기 버튼: 중앙 정렬 & 눈에 잘 띄는 파란색 선명한 배경 */
     div[data-testid="stForm"] div.stButton {
         display: flex !important;
         justify-content: center !important;
@@ -165,7 +169,6 @@ st.markdown("""
         box-shadow: 0 6px 16px rgba(2, 132, 199, 0.5) !important;
     }
 
-    /* Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -308,7 +311,6 @@ df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
 
-# 📌 메모리 초과 방지 캐싱 전처리 로직
 @st.cache_data(max_entries=3, ttl=3600)
 def process_iss_merged(df_iss, df_wt):
     if df_iss is None or df_wt is None:
@@ -943,7 +945,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (RBD Hierarchy 정렬 적용)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -1140,7 +1142,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 )
                 mask_grp &= (~is_grp_cond)
 
-        df_grp_filtered = df_grp_raw[mask_grp]
+        # 📌 OOM 예방 .copy() 연산
+        df_grp_filtered = df_grp_raw[mask_grp].copy()
 
         if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns and 'Date_Obj' in df_grp_filtered.columns:
             df_grp_filtered['Date_Str'] = df_grp_filtered['Date_Obj'].dt.strftime('%m/%d')
