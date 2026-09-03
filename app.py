@@ -87,7 +87,6 @@ st.markdown("""
         padding: 2px 6px;
         border-radius: 4px;
     }
-    /* 상단 필터 영역 카능 및 강조 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 2px solid #0ea5e9 !important;
@@ -258,7 +257,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 상단 대시보드 구조 재편 (3/4수송 vs 6수송)
+# 상단 대시보드 구조 재편
 # -------------------------------------------------------------
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 selected_group = st.radio(
@@ -300,15 +299,19 @@ def format_dep_time(dep_val):
 # ==========================================
 if selected_group == "✈️ 3/4수송 대시보드":
     st.markdown("---")
-    st.markdown('<div style="font-size:16px; font-weight:700; color:#0284c7; margin-bottom:8px;">📌 3/4수송 소그룹 선택:</div>', unsafe_allow_html=True)
-    sub_mode = st.radio(
-        "3/4수송 세부 대시보드:",
-        options=["🎟️ 발매 M/S 대시보드", "✈️ 공급 M/S 대시보드"],
-        horizontal=True,
-        label_visibility="collapsed"
-    )
+    
+    # 📌 요청반영: 3/4수송 하위 탭 구조 재편 (발매M/S, 공급M/S, 대리점/RBD별 발매현황, 단체실적)
+    tab_34_1, tab_34_2, tab_34_3, tab_34_4 = st.tabs([
+        "🎟️ 발매 M/S", 
+        "✈️ 공급 M/S", 
+        "🏷️ 대리점,RBD별 발매현황", 
+        "👥 단체실적"
+    ])
 
-    if sub_mode == "🎟️ 발매 M/S 대시보드":
+    # -------------------------------------------------------------
+    # 1. 🎟️ 발매 M/S 탭
+    # -------------------------------------------------------------
+    with tab_34_1:
         if df_iss_raw is None or df_wt_raw is None:
             st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV.csv]와 [가중치 파일.csv]를 업로드해주세요.")
             st.stop()
@@ -378,7 +381,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 요청반영: 3/4수송 발매 필터 상단 이관 (Expander 카드 레이아웃)
         with st.expander("🔍 **발매 대시보드 검색 & 필터 설정** (클릭하여 여닫기)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
@@ -637,10 +639,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 else:
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
-    else:
-        # ==========================================
-        # ✈️ 공급 M/S 대시보드
-        # ==========================================
+    # -------------------------------------------------------------
+    # 2. ✈️ 공급 M/S 탭
+    # -------------------------------------------------------------
+    with tab_34_2:
         if df_sup_raw is None:
             st.info("👈 좌측 사이드바에서 [공급_9월1주차_CSV.csv] 파일을 업로드해주세요.")
             st.stop()
@@ -678,7 +680,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
 
-        # 📌 요청반영: 3/4수송 공급 필터 상단 이관 (Expander 카드 레이아웃)
         with st.expander("🔍 **공급 대시보드 검색 & 필터 설정** (클릭하여 여닫기)", expanded=True):
             with st.form("sup_filter_form_top"):
                 metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
@@ -848,6 +849,186 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         apply_bottom_legend(fig_timeline)
                         st.plotly_chart(fig_timeline, width="stretch")
 
+    # -------------------------------------------------------------
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (신규)
+    # -------------------------------------------------------------
+    with tab_34_3:
+        if df_iss_raw is None:
+            st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV.csv] 파일이 업로드되어 있는지 확인해주세요.")
+            st.stop()
+
+        df_agency = df_iss_raw.copy()
+        df_agency['Value'] = pd.to_numeric(df_agency['Value'], errors='coerce').fillna(0)
+        df_agency['노선'] = df_agency['노선'].astype(str).str.strip()
+
+        week_col_a = '발매 주차' if '발매 주차' in df_agency.columns else ('발매주차' if '발매주차' in df_agency.columns else None)
+        month_col_a = '출발월' if '출발월' in df_agency.columns else ('출발 월' if '출발 월' in df_agency.columns else None)
+        bound_col_a = '수송' if '수송' in df_agency.columns else ('Bound' if 'Bound' in df_agency.columns else None)
+        time_col_a = '출발시간대' if '출발시간대' in df_agency.columns else None
+        
+        all_routes_a = sorted([str(x) for x in df_agency['노선'].dropna().unique()])
+        all_months_a = sorted([str(x) for x in df_agency[month_col_a].dropna().unique()]) if month_col_a else []
+        all_bounds_a = sorted([str(x) for x in df_agency[bound_col_a].dropna().unique()]) if bound_col_a else []
+        all_tt_a = sorted([str(x) for x in df_agency['Ticket Type'].dropna().unique()]) if 'Ticket Type' in df_agency.columns else []
+        all_time_a = sorted([str(x) for x in df_agency[time_col_a].dropna().unique()]) if time_col_a else []
+        all_al_a = ['KE'] + [x for x in sorted([str(x) for x in df_agency['Dominant Marketing Airline'].dropna().unique()]) if x != 'KE']
+
+        with st.expander("🔍 **대리점 & RBD 분석 검색 필터** (클릭하여 여닫기)", expanded=True):
+            with st.form("agency_rbd_filter_form"):
+                ac1, ac2, ac3 = st.columns(3)
+                
+                def get_ag_selection(col_obj, label, full_list):
+                    options = [ALL_OPTION] + full_list
+                    selected = col_obj.multiselect(label, options=options, default=[ALL_OPTION])
+                    return full_list if ALL_OPTION in selected or not selected else selected
+
+                sel_routes_a = get_ag_selection(ac1, "1. 노선", all_routes_a)
+                sel_months_a = get_ag_selection(ac2, "2. 출발 월", all_months_a) if month_col_a else []
+                sel_bounds_a = get_ag_selection(ac3, "3. BOUND (수송)", all_bounds_a) if bound_col_a else []
+
+                ac4, ac5, ac6 = st.columns(3)
+                sel_tt_a = get_ag_selection(ac4, "4. TRIP TYPE", all_tt_a) if 'Ticket Type' in df_agency.columns else []
+                sel_time_a = get_ag_selection(ac5, "5. 출발 시간대", all_time_a) if time_col_a else []
+                sel_al_a = get_ag_selection(ac6, "6. 항공사 (KE 최우선)", all_al_a)
+
+                st.form_submit_button("🚀 필터 적용하기")
+
+        # 필터링 마스크
+        mask_ag = df_agency['노선'].astype(str).isin(sel_routes_a) & df_agency['Dominant Marketing Airline'].astype(str).isin(sel_al_a)
+        if month_col_a: mask_ag &= df_agency[month_col_a].astype(str).isin(sel_months_a)
+        if bound_col_a: mask_ag &= df_agency[bound_col_a].astype(str).isin(sel_bounds_a)
+        if 'Ticket Type' in df_agency.columns: mask_ag &= df_agency['Ticket Type'].astype(str).isin(sel_tt_a)
+        if time_col_a: mask_ag &= df_agency[time_col_a].astype(str).isin(sel_time_a)
+
+        df_ag_filtered = df_agency[mask_ag]
+
+        sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매 현황", "🏢 대리점별 판매현황"])
+
+        # ① RBD별 판매 현황
+        with sub_tab_rbd:
+            st.markdown("##### 📌 주차별 / 항공사별 RBD 판매 현황")
+            if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
+                piv_rbd = df_ag_filtered.pivot_table(
+                    index=['Dominant Marketing Airline', 'O&D RBKD'],
+                    columns=week_col_a,
+                    values='Value',
+                    aggfunc='sum',
+                    fill_value=0,
+                    observed=False
+                )
+                piv_rbd['합계'] = piv_rbd.sum(axis=1)
+                piv_rbd = piv_rbd.sort_values(by='합계', ascending=False)
+                
+                # 표출용 천단위 콤마 포맷팅
+                st.dataframe(piv_rbd.map(lambda x: f"{x:,.0f}" if pd.notnull(x) and x > 0 else "-"), width="stretch")
+            else:
+                st.warning("선택된 조건의 RBD 데이터가 없습니다.")
+
+        # ② 대리점별 판매현황
+        with sub_tab_agency:
+            st.markdown("##### 📌 주차별 / 대리점별 / 항공사별 판매현황")
+            if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
+                piv_agency = df_ag_filtered.pivot_table(
+                    index=['Travel Agency Name', 'Dominant Marketing Airline'],
+                    columns=week_col_a,
+                    values='Value',
+                    aggfunc='sum',
+                    fill_value=0,
+                    observed=False
+                )
+                piv_agency['총 판매량'] = piv_agency.sum(axis=1)
+                piv_agency = piv_agency.sort_values(by='총 판매량', ascending=False)
+
+                st.dataframe(piv_agency.map(lambda x: f"{x:,.0f}" if pd.notnull(x) and x > 0 else "-"), width="stretch")
+            else:
+                st.warning("선택된 조건의 대리점 데이터가 없습니다.")
+
+    # -------------------------------------------------------------
+    # 4. 👥 단체실적 탭 (신규: 향후 10일간 항공사/대리점발 판매 실적)
+    # -------------------------------------------------------------
+    with tab_34_4:
+        st.subheader("👥 향후 10일간 항공사 / 대리점발 판매 실적 현황")
+        
+        if df_iss_raw is None:
+            st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV.csv] 파일이 업로드되어 있는지 확인해주세요.")
+            st.stop()
+
+        df_group = df_iss_raw.copy()
+        df_group['Value'] = pd.to_numeric(df_group['Value'], errors='coerce').fillna(0)
+        df_group['Ticket Purchase Date'] = pd.to_datetime(df_group['Ticket Purchase Date'], errors='coerce')
+
+        # 데이터 내 최신 10일간 범위 자동 산출
+        max_p_date = df_group['Ticket Purchase Date'].max() if not df_group['Ticket Purchase Date'].dropna().empty else datetime.datetime.now()
+        min_10d_date = max_p_date - datetime.timedelta(days=9)
+
+        with st.expander("🔍 **단체 실적 검색 & 기간 설정** (클릭하여 여닫기)", expanded=True):
+            gc1, gc2, gc3 = st.columns([1.5, 1, 1])
+            date_range = gc1.date_input(
+                "🗓️ 분석 발매일 범위 선택 (기본: 최근 10일간):",
+                value=[min_10d_date.date(), max_p_date.date()] if pd.notnull(max_p_date) else [datetime.date.today(), datetime.date.today()]
+            )
+            
+            all_al_g = ['KE'] + [x for x in sorted([str(x) for x in df_group['Dominant Marketing Airline'].dropna().unique()]) if x != 'KE']
+            sel_al_g = gc2.multiselect("항공사 선택:", options=[ALL_OPTION] + all_al_g, default=[ALL_OPTION])
+            
+            all_ag_g = sorted([str(x) for x in df_group['Travel Agency Name'].dropna().unique()]) if 'Travel Agency Name' in df_group.columns else []
+            sel_ag_g = gc3.multiselect("대리점 검색 선택:", options=[ALL_OPTION] + all_ag_g, default=[ALL_OPTION])
+
+        # 날짜 필터링
+        if len(date_range) == 2:
+            start_d, end_d = date_range[0], date_range[1]
+            mask_10d = (df_group['Ticket Purchase Date'].dt.date >= start_d) & (df_group['Ticket Purchase Date'].dt.date <= end_d)
+        else:
+            mask_10d = pd.Series(True, index=df_group.index)
+
+        if ALL_OPTION not in sel_al_g and sel_al_g:
+            mask_10d &= df_group['Dominant Marketing Airline'].astype(str).isin(sel_al_g)
+        if ALL_OPTION not in sel_ag_g and sel_ag_g and 'Travel Agency Name' in df_group.columns:
+            mask_10d &= df_group['Travel Agency Name'].astype(str).isin(sel_ag_g)
+
+        df_10d_filtered = df_group[mask_10d]
+
+        # 요약 메트릭 카딩
+        tot_10d_pax = df_10d_filtered['Value'].sum()
+        ke_10d_pax = df_10d_filtered[df_10d_filtered['Dominant Marketing Airline'] == 'KE']['Value'].sum() if not df_10d_filtered.empty else 0
+        ke_10d_ms = (ke_10d_pax / tot_10d_pax * 100) if tot_10d_pax > 0 else 0
+        
+        top_agency_10d = "-"
+        if not df_10d_filtered.empty and 'Travel Agency Name' in df_10d_filtered.columns:
+            top_agency_10d = str(df_10d_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().idxmax())
+
+        gm1, gm2, gm3 = st.columns(3)
+        with gm1:
+            st.markdown(f'<div class="metric-card"><div class="metric-title">10일간 총 발매 실적</div><div class="metric-value">{tot_10d_pax:,.0f}</div></div>', unsafe_allow_html=True)
+        with gm2:
+            st.markdown(f'<div class="metric-card-ke"><div class="metric-title" style="color:#0284c7; font-weight:bold;">✈️ KE (대한항공) 10일간 발매 실적</div><div class="metric-value" style="color:#0284c7;"><b>{ke_10d_pax:,.0f} ({ke_10d_ms:.1f}%)</b></div></div>', unsafe_allow_html=True)
+        with gm3:
+            st.markdown(f'<div class="metric-card"><div class="metric-title">10일간 최다 판매 대리점</div><div class="metric-value" style="color:#1d4ed8;"><b>{top_agency_10d}</b></div></div>', unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        if not df_10d_filtered.empty and 'Travel Agency Name' in df_10d_filtered.columns:
+            st.markdown("##### 📌 대리점별 x 항공사별 10일간 발매 실적 매트릭스")
+            piv_10d = df_10d_filtered.pivot_table(
+                index='Travel Agency Name',
+                columns='Dominant Marketing Airline',
+                values='Value',
+                aggfunc='sum',
+                fill_value=0,
+                observed=False
+            )
+            
+            piv_10d['총합계'] = piv_10d.sum(axis=1)
+            piv_10d = piv_10d.sort_values(by='총합계', ascending=False)
+            
+            # 대한항공 열 최우선 배치
+            cols_10d = ['총합계'] + (['KE'] if 'KE' in piv_10d.columns else []) + [c for c in piv_10d.columns if c not in ['총합계', 'KE']]
+            piv_10d = piv_10d[cols_10d]
+
+            st.dataframe(piv_10d.map(lambda x: f"{x:,.0f}" if pd.notnull(x) and x > 0 else "-"), width="stretch")
+        else:
+            st.warning("선택된 기간의 발매 데이터가 존재하지 않습니다.")
+
 # ==========================================
 # GROUP 2: 🌐 6수송 대시보드
 # ==========================================
@@ -905,7 +1086,6 @@ else:
     else:
         sorted_6th_airlines = []
 
-    # 📌 요청반영: 6수송 10대 필터 상단 이관 (멀티셀렉트 + 기본 모든값 선택)
     with st.expander("🔍 **6수송 대시보드 검색 & 필터 설정** (클릭하여 여닫기)", expanded=True):
         with st.form("filter_6th_form_top"):
             c6_f1, c6_f2, c6_f3, c6_f4 = st.columns(4)
