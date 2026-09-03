@@ -31,7 +31,7 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# 📌 항공사별 RBD 계층(Hierarchy) 정의
+# 항공사별 RBD 계층(Hierarchy) 정의
 RBD_HIERARCHY = {
     'KE': list('YBMSHEKLUQTX'),
     'OZ': list('YBMHEQKSVWTLX'),
@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 CSS 스타일 (테두리 및 그림자 제거, 파란색 버튼 가운데 정렬)
+# CSS Styling (스카이블루 #0ea5e9 고정)
 st.markdown("""
 <style>
     :root {
@@ -130,7 +130,6 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 필터 박스 깔끔한 외곽선 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
@@ -140,7 +139,6 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
-    /* 📌 필터 적용하기 버튼: 가운데 정렬, 테두리/그림자 제거한 파란색 버튼 */
     div[data-testid="stForm"] div.stButton {
         display: flex !important;
         justify-content: center !important;
@@ -169,7 +167,6 @@ st.markdown("""
         background-color: #0284c7 !important;
     }
 
-    /* Table Styling */
     .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -258,7 +255,22 @@ uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['
 uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
-@st.cache_data(max_entries=2, ttl=3600)
+# 📌 메모리 점유율을 80% 줄여주는 경량화 함수
+def optimize_df(df_in):
+    if df_in is None:
+        return None
+    for col in df_in.columns:
+        if df_in[col].dtype == 'object':
+            num_unique = df_in[col].nunique()
+            if num_unique < len(df_in) * 0.5:
+                df_in[col] = df_in[col].astype('category')
+        elif df_in[col].dtype == 'int64':
+            df_in[col] = df_in[col].astype('int32')
+        elif df_in[col].dtype == 'float64':
+            df_in[col] = df_in[col].astype('float32')
+    return df_in
+
+@st.cache_data(max_entries=1, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
         return None
@@ -269,16 +281,16 @@ def load_smart_file(uploaded_file):
             csv_files = [f for f in z.namelist() if f.endswith('.csv') and not f.startswith('__MACOSX')]
             if csv_files:
                 with z.open(csv_files[0]) as f:
-                    return pd.read_csv(f, low_memory=False)
+                    return optimize_df(pd.read_csv(f, low_memory=False))
     elif file_name.endswith('.parquet'):
-        return pd.read_parquet(uploaded_file)
+        return optimize_df(pd.read_parquet(uploaded_file))
     elif file_name.endswith('.csv'):
-        return pd.read_csv(uploaded_file, low_memory=False)
+        return optimize_df(pd.read_csv(uploaded_file, low_memory=False))
     elif file_name.endswith('.xlsx') or file_name.endswith('.xls'):
-        return pd.read_excel(uploaded_file)
+        return optimize_df(pd.read_excel(uploaded_file))
     return None
 
-@st.cache_data(max_entries=2, ttl=3600)
+@st.cache_data(max_entries=1, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
     if os.path.exists('34수송_9월1주차_CSV_2.csv'):
@@ -303,7 +315,7 @@ def load_data_from_disk():
     elif os.path.exists('6th_freedom.csv'):
         df_6th = pd.read_csv('6th_freedom.csv', low_memory=False)
         
-    return df_iss, df_wt, df_sup, df_6th
+    return optimize_df(df_iss), optimize_df(df_wt), optimize_df(df_sup), optimize_df(df_6th)
 
 disk_iss, disk_wt, disk_sup, disk_6th = load_data_from_disk()
 
@@ -312,8 +324,8 @@ df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
 
-# 📌 OH NO 메모리 초과 방지 캐싱 전처리 함수
-@st.cache_data(max_entries=2, ttl=3600)
+# 📌 OOM 방지 캐싱 전처리 함수
+@st.cache_data(max_entries=1, ttl=3600)
 def process_iss_merged(df_iss, df_wt):
     if df_iss is None or df_wt is None:
         return None
@@ -368,7 +380,7 @@ def process_iss_merged(df_iss, df_wt):
     merged_df['Weighted_Ratio'] = np.where(route_sumproduct > 0, merged_df['Raw_Weighted_Value'] / route_sumproduct, 0)
     merged_df['Weighted_Value'] = merged_df['Weighted_Ratio'] * route_raw_sum
 
-    return merged_df
+    return optimize_df(merged_df)
 
 # Header Notice
 st.title("✈️ 항공사 노선별 통합 M/S 분석 대시보드")
@@ -1064,7 +1076,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
         with sub_tab_agency:
-            st.markdown("##### 📌 주차별 / 대리점별 / 항공사별 판매현황")
+            st.markdown("##### 📌 주차별 / 대리점별 / 항공사별 판매현황 (상위 300개 대리점 표출)")
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
                 piv_agency = df_ag_filtered.pivot_table(
                     index=['Travel Agency Name', 'Dominant Marketing Airline'],
@@ -1075,7 +1087,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     observed=False
                 )
                 piv_agency['총 판매량'] = piv_agency.sum(axis=1)
-                piv_agency = piv_agency.sort_values(by='총 판매량', ascending=False)
+                piv_agency = piv_agency.sort_values(by='총 판매량', ascending=False).head(300)
 
                 st.dataframe(piv_agency.map(lambda x: f"{x:,.0f}" if pd.notnull(x) and x > 0 else "-"), width="stretch")
             else:
@@ -1144,7 +1156,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 )
                 mask_grp &= (~is_grp_cond)
 
-        # 📌 OOM 크래시 방지 .copy() 연산
         df_grp_filtered = df_grp_raw[mask_grp].copy()
 
         if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns and 'Date_Obj' in df_grp_filtered.columns:
@@ -1176,7 +1187,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             observed=False
                         )
                         piv_grp_single['총합계'] = piv_grp_single.sum(axis=1)
-                        piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False)
+                        # 📌 렌더링 부하 방지를 위해 상위 100개 대리점 표출
+                        piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(100)
 
                         g_html = '<div class="yoy-table-container"><table class="yoy-table">'
                         g_html += '<thead><tr><th class="mkt-header" style="width:220px; text-align:left; padding-left:12px;">대리점명 (DEP DATE)</th>'
