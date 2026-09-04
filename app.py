@@ -47,51 +47,65 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 CSS Styling
+# 📌 100% 하늘색 박스 제거 전용 CSS
 st.markdown("""
 <style>
+    /* 1. Streamlit 전역 primaryColor 오버라이드 */
     :root {
         --primary-color: #0ea5e9 !important;
         --primaryColor: #0ea5e9 !important;
     }
     
-    /* 필터 내부의 모든 하늘색 태그/배경 완벽 삭제 */
-    span[data-baseweb="tag"],
-    div[data-baseweb="tag"],
+    /* 2. 드롭다운 박스 내부의 모든 하늘색 태그/박스 요소 완전 영구 파기 */
     div[data-baseweb="select"] span[data-baseweb="tag"],
     div[data-baseweb="select"] div[data-baseweb="tag"],
+    div[data-baseweb="tag"],
+    span[data-baseweb="tag"],
+    [data-baseweb="tag"],
     div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
-    [data-baseweb="tag"] {
+    div[data-testid="stMultiSelect"] div[data-baseweb="tag"] {
         display: none !important;
-        background-color: transparent !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0px !important;
+        height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
         background: transparent !important;
+        background-color: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        color: inherit !important;
     }
 
-    div[data-baseweb="select"] {
-        border-color: #cbd5e1 !important;
+    /* 3. Selectbox 본체 깔끔 무채색 보정 */
+    div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
     }
-    div[data-baseweb="select"]:focus-within {
+    
+    div[data-baseweb="select"] input {
+        background-color: transparent !important;
+    }
+    
+    div[data-baseweb="select"]:focus-within > div {
         border-color: #0ea5e9 !important;
     }
 
+    /* Radio / Toggle */
     div[role="radiogroup"] label div[role="radio"][aria-checked="true"] {
         background-color: #0ea5e9 !important;
         border-color: #0ea5e9 !important;
     }
-
     button[data-baseweb="tab"][aria-selected="true"] {
         color: #0ea5e9 !important;
         border-bottom-color: #0ea5e9 !important;
     }
-    
     div[data-testid="stToggle"] input:checked + div {
         background-color: #0ea5e9 !important;
     }
 
+    /* Header & 카드 */
     .source-header-box {
         background-color: #f0f9ff;
         border-left: 5px solid #0284c7;
@@ -146,7 +160,7 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 필터 박스 깔끔한 외곽선 */
+    /* 필터 박스 프레임 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
@@ -491,7 +505,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        # 📌 요청반영: KE 취항 여부 == '취항'인 노선 목록을 기본 노선 리스트로 설정
         if ke_service_col and '취항' in all_ke_services:
             ke_only_df = merged_df[merged_df[ke_service_col] == '취항']
             route_order_sum = ke_only_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
@@ -749,7 +762,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (요청반영: 스케줄 타임라인 KE 막대 두꺼운 테두리 및 색상 강조)
+    # 2. ✈️ 공급 M/S 탭 (요청반영: 스케줄 타임라인 KE 막대 두꺼운 테두리 강조)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -968,7 +981,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                         fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
                         
-                        # 📌 요청반영: 스케줄 타임라인 내 KE 막대에 두꺼운 테두리 및 색상 강하게 강조
+                        # 📌 스케줄 타임라인 내 KE 막대에 두꺼운 테두리 및 색상 강조
                         for trace in fig_timeline.data:
                             if trace.name == 'KE':
                                 trace.marker.line.color = '#0284c7'
@@ -980,7 +993,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (요청반영: 아코디언 제거->단일테이블 & 상위 20개 대리점 하단 항공사 정렬)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (요청반영 2: 단일통합테이블 & 3: 상위20개 대리점 하단 항공사 정렬)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -1034,6 +1047,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매 현황 (단일 통합 테이블)", "🏢 대리점별 판매현황 (상위 20개 대리점 / 항공사 정렬)"])
 
+        # 📌 요청반영 2: 아코디언 완전 제거 -> 단일 통합 피벗 테이블 표출
         with sub_tab_rbd:
             st.markdown("##### 📌 RBD 클래스 / 항공사별 / 주차별 발매 실적 현황")
             if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
@@ -1057,6 +1071,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             else:
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
+        # 📌 요청반영 3: 대리점 상위 20개 선정 후 하위에 항공사별 정렬
         with sub_tab_agency:
             st.markdown("##### 📌 상위 TOP 20 대리점별 / 하위 항공사별 발매 현황")
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
