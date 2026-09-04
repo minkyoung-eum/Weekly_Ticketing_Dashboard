@@ -31,7 +31,6 @@ for i in range(5):
 dep_range_str = f"{dep_months[0]} ~ {dep_months[-1]}"
 issue_range_str = f"{issue_start_date.strftime('%Y.%m.%d')} ~ {issue_end_date.strftime('%Y.%m.%d')}"
 
-# 오늘 기준 10일 이후 날짜 (단체실적 필터용)
 future_10_days = today + datetime.timedelta(days=10)
 
 # 항공사별 RBD 계층(Hierarchy) 정의
@@ -56,6 +55,25 @@ st.markdown("""
     :root {
         --primary-color: #0ea5e9 !important;
         --primaryColor: #0ea5e9 !important;
+    }
+
+    /* 드롭다운 우측 파란색 알약 태그 상자 완전 제거 */
+    div[data-testid="stSelectbox"] span[data-baseweb="tag"],
+    div[data-testid="stSelectbox"] div[data-baseweb="tag"],
+    div[data-baseweb="select"] span[data-baseweb="tag"],
+    div[data-baseweb="select"] div[data-baseweb="tag"],
+    div[data-baseweb="select"] [aria-label="Clear"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0px !important;
+        height: 0px !important;
+    }
+
+    div[data-testid="stSelectbox"] > div {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+        background-color: #ffffff !important;
     }
 
     div[role="radiogroup"] label div[role="radio"][aria-checked="true"] {
@@ -478,6 +496,11 @@ def format_dep_time(dep_val):
         return f"2026-08-01 {hh:02d}:{mm:02d}:00", f"2026-08-01 {(hh+2)%24:02d}:{mm:02d}:00"
     except:
         return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
+
+def create_dropdown_str(col_obj, label, full_list):
+    opts = [ALL_OPTION] + full_list
+    selected = col_obj.selectbox(label, options=opts, index=0)
+    return selected
 
 def render_clean_filter_popover(label, options_list, key_name):
     opts = [ALL_OPTION] + options_list
@@ -916,7 +939,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_s4)
                     st.plotly_chart(fig_s4, width="stretch")
 
-            # 타 항공사(ZG, ET, MM 등 포함) 색상을 회색으로 강제 통합 적용
+            # 타 항공사(ZG, ET, MM 등) 색상을 회색으로 강제 통합 적용
             st.markdown("---")
             st.subheader("✈️ 항공사별 스케줄 타임라인")
             
@@ -1121,7 +1144,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
     # -------------------------------------------------------------
-    # 4. 👥 단체실적 탭 (대리점 열 넓게 300px + 오늘 기준 +10일 이후 조건 완벽 오류 수정)
+    # 4. 👥 단체실적 탭 (대리점 열 넓게 300px + 오늘 기준 +10일 이후 조건 적용)
     # -------------------------------------------------------------
     with tab_34_4:
         st.subheader("👥 항공사별 / 대리점별 단체 실적 현황")
@@ -1136,11 +1159,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if ke_service_col_grp:
             df_grp_raw = df_grp_raw[df_grp_raw[ke_service_col_grp].astype(str) == '취항']
 
-        # 📌 날짜 비교 시 TypeError 방지를 위한 Datetime 강제 캐스팅
         dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else 'Ticket Purchase Date')
         df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
         
-        # Datetime 타입으로 강제 변환 후 오늘 기준 +10일 이후 조건 필터링
         target_future_dt = pd.to_datetime(future_10_days)
         df_grp_raw = df_grp_raw[df_grp_raw['Date_Obj'] >= target_future_dt]
 
@@ -1223,7 +1244,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         piv_grp_single['총합계'] = piv_grp_single.sum(axis=1)
                         piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(50)
 
-                        # 대리점명 열 크기 300px로 대폭 확장
                         g_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
                         g_html += '<thead><tr><th class="header-main" style="width:300px; text-align:left; padding-left:15px;">대리점명 (DEP DATE)</th>'
                         
@@ -1395,7 +1415,7 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425) 100% 동기화 및 독립 YOY 연산
+    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425) 100% 동기화 및 독립 YOY 집계
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
