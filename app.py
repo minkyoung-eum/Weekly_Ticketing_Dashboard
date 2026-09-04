@@ -47,23 +47,39 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 100% 하늘색 박스 제거 전용 CSS
+# 📌 100% 드롭다운 우측 패널 하늘색 배경 차단 CSS
 st.markdown("""
 <style>
-    /* 1. Streamlit 전역 primaryColor 오버라이드 */
-    :root {
-        --primary-color: #0ea5e9 !important;
-        --primaryColor: #0ea5e9 !important;
+    /* 1. 드롭다운 박스 전체 외곽 틀 (흰색 배경 + 연회색 테두리) */
+    div[data-baseweb="select"] {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
     }
     
-    /* 2. 드롭다운 박스 내부의 모든 하늘색 태그/박스 요소 완전 영구 파기 */
-    div[data-baseweb="select"] span[data-baseweb="tag"],
-    div[data-baseweb="select"] div[data-baseweb="tag"],
-    div[data-baseweb="tag"],
+    /* 2. 📌 핵심: 드롭다운 우측 화살표 패널 및 내부 모든 자식 요소의 배경색 완전 파괴 및 투명화 */
+    div[data-baseweb="select"] *,
+    div[data-baseweb="select"] div,
+    div[data-baseweb="select"] span,
+    div[data-baseweb="select"] button,
+    div[data-baseweb="select"] svg,
+    div[data-baseweb="select"] [role="button"] {
+        background: transparent !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border-color: transparent !important;
+    }
+    
+    /* 3. 드롭다운 우측 화살표 아이콘 색상 단정 지정 */
+    div[data-baseweb="select"] svg {
+        fill: #64748b !important;
+        color: #64748b !important;
+    }
+
+    /* 4. 잔여 태그 요소 완전 숨김 */
     span[data-baseweb="tag"],
-    [data-baseweb="tag"],
-    div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
-    div[data-testid="stMultiSelect"] div[data-baseweb="tag"] {
+    div[data-baseweb="tag"],
+    [data-baseweb="tag"] {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
@@ -71,25 +87,6 @@ st.markdown("""
         height: 0px !important;
         margin: 0px !important;
         padding: 0px !important;
-        background: transparent !important;
-        background-color: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-
-    /* 3. Selectbox 본체 깔끔 무채색 보정 */
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-    }
-    
-    div[data-baseweb="select"] input {
-        background-color: transparent !important;
-    }
-    
-    div[data-baseweb="select"]:focus-within > div {
-        border-color: #0ea5e9 !important;
     }
 
     /* Radio / Toggle */
@@ -762,7 +759,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (요청반영: 스케줄 타임라인 KE 막대 두꺼운 테두리 강조)
+    # 2. ✈️ 공급 M/S 탭 (스케줄 타임라인 KE 막대 두꺼운 테두리 강조)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -981,7 +978,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                         fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
                         
-                        # 📌 스케줄 타임라인 내 KE 막대에 두꺼운 테두리 및 색상 강조
+                        # 📌 KE 막대 두꺼운 테두리 및 강조
                         for trace in fig_timeline.data:
                             if trace.name == 'KE':
                                 trace.marker.line.color = '#0284c7'
@@ -993,7 +990,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (요청반영 2: 단일통합테이블 & 3: 상위20개 대리점 하단 항공사 정렬)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -1047,7 +1044,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매 현황 (단일 통합 테이블)", "🏢 대리점별 판매현황 (상위 20개 대리점 / 항공사 정렬)"])
 
-        # 📌 요청반영 2: 아코디언 완전 제거 -> 단일 통합 피벗 테이블 표출
         with sub_tab_rbd:
             st.markdown("##### 📌 RBD 클래스 / 항공사별 / 주차별 발매 실적 현황")
             if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
@@ -1071,7 +1067,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             else:
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
-        # 📌 요청반영 3: 대리점 상위 20개 선정 후 하위에 항공사별 정렬
         with sub_tab_agency:
             st.markdown("##### 📌 상위 TOP 20 대리점별 / 하위 항공사별 발매 현황")
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
