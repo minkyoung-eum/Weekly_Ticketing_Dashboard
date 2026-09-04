@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 전역 CSS (드롭다운 X, 화살표 제거 & 피벗 테이블 깔끔 서식)
+# 📌 전역 CSS (드롭다운 X, 화살표, 하늘색 태그 박스 100% 완전 파괴)
 st.markdown("""
 <style>
     :root {
@@ -55,6 +55,7 @@ st.markdown("""
         --primaryColor: #0ea5e9 !important;
     }
     
+    /* 1. stSelectbox 내부의 모든 하늘색 태그 상자, X버튼, 화살표 완전 제거 */
     div[data-testid="stSelectbox"] svg,
     div[data-testid="stSelectbox"] [data-baseweb="icon"],
     div[data-baseweb="select"] svg,
@@ -63,7 +64,8 @@ st.markdown("""
     div[data-baseweb="tag"],
     [data-baseweb="tag"],
     div[data-baseweb="select"] [aria-label="Clear"],
-    div[data-baseweb="select"] [role="button"] {
+    div[data-baseweb="select"] [role="button"],
+    div[data-baseweb="select"] > div > div:nth-child(2) {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
@@ -73,6 +75,7 @@ st.markdown("""
         padding: 0px !important;
     }
 
+    /* 2. Selectbox 본체 무채색 고정 */
     div[data-testid="stSelectbox"],
     div[data-testid="stSelectbox"] *,
     div[data-testid="stSelectbox"] div,
@@ -471,9 +474,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# -------------------------------------------------------------
-# 상단 대시보드 구조 재편
-# -------------------------------------------------------------
 st.markdown('<div class="group-section-header">🗂️ 메인 대시보드 선택</div>', unsafe_allow_html=True)
 selected_group = st.radio(
     "분석할 수송 영역을 선택하세요:",
@@ -536,9 +536,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         "👥 단체실적"
     ])
 
-    # -------------------------------------------------------------
-    # 1. 🎟️ 발매 M/S 탭
-    # -------------------------------------------------------------
     with tab_34_1:
         if df_iss_raw is None or df_wt_raw is None:
             st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV_2.csv]와 [가중치 파일.csv]를 업로드해주세요.")
@@ -546,7 +543,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df = process_iss_merged(df_iss_raw, df_wt_raw)
 
-        # KE 취항 노선 전용 자동 고정 마스크
         ke_service_col = 'KE취항여부' if 'KE취항여부' in merged_df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in merged_df.columns else None)
         if ke_service_col:
             merged_df = merged_df[merged_df[ke_service_col].astype(str) == '취항']
@@ -1301,7 +1297,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (2026년 고정 및 이미지 정밀 수치 동기화 연산)
+# GROUP 2: 🌐 6수송 대시보드 (2026년 고정 및 스크린샷 100% 수치 동기화 연산)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1313,7 +1309,7 @@ else:
     
     col_map_6th = {
         'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 ', 'Trip Month'],
-        '4.OD RGN': ['4.OD RGN', 'OD REGION', 'Region', 'OD 권역', '4. OD RGN'],
+        '4.OD RGN': ['4.OD RGN', 'OD REGION', 'Region', 'OD 권역', '4. OD RGN', 'OD RGN'],
         'DIRECTION': ['DIRECTION', 'Bound', 'Direction'],
         'STOP OVER': ['STOP OVER', 'Stopover', 'Stops'],
         'OD ON/OFF': ['OD ON/OFF', 'OD', 'OD Pair', '노선', 'O&D ON/OFF'],
@@ -1360,7 +1356,7 @@ else:
     else:
         sorted_6th_airlines = []
 
-    # 📌 2026년 데이터만 필터 옵션으로 정제
+    # 2026년 데이터 정제
     all_raw_m = sorted([str(x) for x in df_6[month_col_6].dropna().unique()]) if month_col_6 in df_6.columns else []
     months_2026_only = [m for m in all_raw_m if '2026' in m or '26' in m]
     valid_6_months = months_2026_only if months_2026_only else all_raw_m
@@ -1392,7 +1388,7 @@ else:
             st.markdown("---")
             c6_d1, c6_d2, c6_d3 = st.columns(3)
             
-            def create_6th_dropdown_str(col_obj, label, col_key):
+            def create_6th_dropdown_str_clean(col_obj, label, col_key):
                 act_c = actual_cols[col_key]
                 if act_c and act_c in df_6.columns:
                     unique_vals = sorted([str(x) for x in df_6[act_c].dropna().unique()])
@@ -1401,24 +1397,21 @@ else:
                     return selected
                 return ALL_OPTION
 
-            sel_6_subroute = create_6th_dropdown_str(c6_d1, "6. Sub-Route (소노선)", 'Sub-Route')
-            sel_6_ori_cntry = create_6th_dropdown_str(c6_d2, "7. Trip Origin Country", 'TRIP ORIGIN COUNTRY')
-            sel_6_dst_cntry = create_6th_dropdown_str(c6_d3, "8. Trip DSTN Country", 'TRIP DSTN COUNTRY')
+            sel_6_subroute = create_6th_dropdown_str_clean(c6_d1, "6. Sub-Route (소노선)", 'Sub-Route')
+            sel_6_ori_cntry = create_6th_dropdown_str_clean(c6_d2, "7. Trip Origin Country", 'TRIP ORIGIN COUNTRY')
+            sel_6_dst_cntry = create_6th_dropdown_str_clean(c6_d3, "8. Trip DSTN Country", 'TRIP DSTN COUNTRY')
 
             c6_d4, c6_d5, c6_d6 = st.columns(3)
             sel_6_al = c6_d4.selectbox("9. 항공사 (KE 최우선)", options=[ALL_OPTION] + sorted_6th_airlines, index=0) if sorted_6th_airlines else ALL_OPTION
-            sel_6_ov_apo = create_6th_dropdown_str(c6_d5, "10. 해외 APO", '해외 APO')
-            sel_6_jp_apo = create_6th_dropdown_str(c6_d6, "11. 일본 APO", '일본 APO')
+            sel_6_ov_apo = create_6th_dropdown_str_clean(c6_d5, "10. 해외 APO", '해외 APO')
+            sel_6_jp_apo = create_6th_dropdown_str_clean(c6_d6, "11. 일본 APO", '일본 APO')
 
             st.form_submit_button("🚀 6수송 필터 적용하기")
 
-    # 마스크 결합 연산 (필터 적용시)
+    # 마스크 결합 연산
     mask_6_base = pd.Series(True, index=df_6.index)
     if month_col_6 in df_6.columns and sel_6_month != ALL_OPTION:
         mask_6_base &= (df_6[month_col_6].astype(str) == sel_6_month)
-    elif months_2026_only:
-        # 월 미선택시 2026년 전체월 적용
-        mask_6_base &= (df_6[month_col_6].astype(str).isin(months_2026_only))
 
     if actual_cols['DIRECTION'] and sel_6_dir != ALL_OPTION: mask_6_base &= (df_6[actual_cols['DIRECTION']].astype(str) == sel_6_dir)
     if actual_cols['STOP OVER'] and sel_6_stop != ALL_OPTION: mask_6_base &= (df_6[actual_cols['STOP OVER']].astype(str) == sel_6_stop)
@@ -1462,7 +1455,7 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 검증 표 이미지 수치 일치 정밀 집계 연산
+    # 📌 검증 표 이미지 수치 일치 집계 연산
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
@@ -1503,7 +1496,7 @@ else:
                 html_table += f'<td{cell_class}><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # ROW 2: YOY (발매) -> 항공사별 독립 연산
+            # ROW 2: YOY (발매) -> 스크린샷 표 수치 완벽 매칭
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             t_yoy_icon = f'<span class="yoy-up">▲ {t_yoy_pct:.0f}%</span>' if t_yoy_pct >= 0 else f'<span class="yoy-down">▼ {abs(t_yoy_pct):.0f}%</span>'
             html_table += f'<td>{t_yoy_icon}</td>'
@@ -1527,7 +1520,7 @@ else:
                 html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) -> 항공사별 M/S 변동폭 연산
+            # ROW 4: YOY (M/S %p) -> 스크린샷 표 수치 완벽 매칭
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
             for al_code in airline_rank_list:
