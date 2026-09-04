@@ -47,36 +47,37 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 100% 드롭다운 우측 패널 하늘색 배경 차단 CSS
+# 📌 100% 드롭다운(stSelectbox) 파란색 박스 제로화 CSS
 st.markdown("""
 <style>
-    /* 1. 드롭다운 박스 전체 외곽 틀 (흰색 배경 + 연회색 테두리) */
-    div[data-baseweb="select"] {
+    /* 1. Streamlit stSelectbox 컴포넌트 내부 및 우측 패널 파란색 완벽 박멸 */
+    div[data-testid="stSelectbox"],
+    div[data-testid="stSelectbox"] *,
+    div[data-testid="stSelectbox"] div,
+    div[data-testid="stSelectbox"] span,
+    div[data-testid="stSelectbox"] button,
+    div[data-testid="stSelectbox"] [role="button"],
+    div[data-testid="stSelectbox"] [data-baseweb="select"],
+    div[data-testid="stSelectbox"] [aria-expanded],
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] * {
         background-color: #ffffff !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+    }
+    
+    /* 2. 드롭다운 외곽 테두리 및 화살표 아이콘 무채색 지정 */
+    div[data-testid="stSelectbox"] > div {
         border: 1px solid #cbd5e1 !important;
         border-radius: 6px !important;
     }
     
-    /* 2. 📌 핵심: 드롭다운 우측 화살표 패널 및 내부 모든 자식 요소의 배경색 완전 파괴 및 투명화 */
-    div[data-baseweb="select"] *,
-    div[data-baseweb="select"] div,
-    div[data-baseweb="select"] span,
-    div[data-baseweb="select"] button,
-    div[data-baseweb="select"] svg,
-    div[data-baseweb="select"] [role="button"] {
-        background: transparent !important;
-        background-color: transparent !important;
-        box-shadow: none !important;
-        border-color: transparent !important;
-    }
-    
-    /* 3. 드롭다운 우측 화살표 아이콘 색상 단정 지정 */
-    div[data-baseweb="select"] svg {
+    div[data-testid="stSelectbox"] svg {
         fill: #64748b !important;
         color: #64748b !important;
     }
 
-    /* 4. 잔여 태그 요소 완전 숨김 */
+    /* 3. 불필요한 태그 박스 완전 숨김 */
     span[data-baseweb="tag"],
     div[data-baseweb="tag"],
     [data-baseweb="tag"] {
@@ -85,8 +86,6 @@ st.markdown("""
         opacity: 0 !important;
         width: 0px !important;
         height: 0px !important;
-        margin: 0px !important;
-        padding: 0px !important;
     }
 
     /* Radio / Toggle */
@@ -759,7 +758,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (스케줄 타임라인 KE 막대 두꺼운 테두리 강조)
+    # 2. ✈️ 공급 M/S 탭
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -978,7 +977,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                         fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
                         
-                        # 📌 KE 막대 두꺼운 테두리 및 강조
                         for trace in fig_timeline.data:
                             if trace.name == 'KE':
                                 trace.marker.line.color = '#0284c7'
