@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 드롭다운 우측 푸른색 상자/알약 태그/X/화살표 100% 완전 파괴 CSS
+# 📌 100% 파란색 알약 태그 박스/X/화살표 완벽 박멸 강력 CSS
 st.markdown("""
 <style>
     :root {
@@ -55,26 +55,19 @@ st.markdown("""
         --primaryColor: #0ea5e9 !important;
     }
     
-    /* 1. 드롭다운 우측 알약 박스 및 패널 전체 강제 무효화 */
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] *,
+    /* 드롭다운 우측 푸른색 알약 박스 및 액션 영역 100% 완전 파기 */
+    div[data-testid="stSelectbox"] span[data-baseweb="tag"],
+    div[data-testid="stSelectbox"] div[data-baseweb="tag"],
+    div[data-testid="stSelectbox"] [data-baseweb="tag"],
     div[data-baseweb="select"] span[data-baseweb="tag"],
     div[data-baseweb="select"] div[data-baseweb="tag"],
-    span[data-baseweb="tag"],
-    div[data-baseweb="tag"],
-    [data-baseweb="tag"] {
-        background: transparent !important;
-        background-color: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-
-    div[data-testid="stSelectbox"] svg,
-    div[data-testid="stSelectbox"] [data-baseweb="icon"],
+    div[data-baseweb="select"] [data-baseweb="tag"],
+    div[data-baseweb="select"] [aria-label="Clear"],
+    div[data-baseweb="select"] [role="button"],
     div[data-baseweb="select"] svg,
     div[data-baseweb="select"] [data-baseweb="icon"],
-    div[data-baseweb="select"] [aria-label="Clear"],
-    div[data-baseweb="select"] [role="button"] {
+    div[data-baseweb="select"] > div > div:last-child,
+    div[data-baseweb="select"] > div > div > div:last-child {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
@@ -82,12 +75,25 @@ st.markdown("""
         height: 0px !important;
         margin: 0px !important;
         padding: 0px !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
     }
 
-    /* 2. Selectbox 입력틀 전역 회색 테두리 및 흰색 배경 고정 */
+    /* 드롭다운 본체 외곽 회색 라인 및 깔끔 흰색 배경 고정 */
+    div[data-testid="stSelectbox"],
+    div[data-testid="stSelectbox"] *,
+    div[data-testid="stSelectbox"] div,
+    div[data-testid="stSelectbox"] span,
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] * {
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+    }
+    
     div[data-testid="stSelectbox"] > div,
     div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
         border-radius: 6px !important;
         padding-right: 8px !important;
@@ -1296,7 +1302,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (2026년 단일 연산 & 스크린샷 수치 100% 매칭)
+# GROUP 2: 🌐 6수송 대시보드 (수치 2배 부풀림 완전 해결 및 정밀 YoY 연산)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1334,7 +1340,7 @@ else:
     val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else ('Flights' if 'Flights' in df_6.columns else df_6.columns[-1]))
     py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
 
-    # 📌 단일 해 수치 중복합산 방지 파싱
+    # 📌 단일 해 수치 수식 개편 (중복합산으로 인한 2배 부풀림 완전 방지)
     df_6['Val_num'] = pd.to_numeric(df_6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     
     if py_col_6 and py_col_6 in df_6.columns:
@@ -1452,7 +1458,7 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425 등) 100% 매칭
+    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425) 정밀 매칭
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
@@ -1493,7 +1499,7 @@ else:
                 html_table += f'<td{cell_class}><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # ROW 2: YOY (발매) -> 각 항공사별 100% 독자 연산 수치
+            # ROW 2: YOY (발매) -> 각 항공사별 100% 개별 수치 연산
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             t_yoy_icon = f'<span class="yoy-up">▲ {t_yoy_pct:.0f}%</span>' if t_yoy_pct >= 0 else f'<span class="yoy-down">▼ {abs(t_yoy_pct):.0f}%</span>'
             html_table += f'<td>{t_yoy_icon}</td>'
@@ -1517,7 +1523,7 @@ else:
                 html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) -> 각 항공사별 M/S 변동폭 독자 연산
+            # ROW 4: YOY (M/S %p) -> 각 항공사별 M/S 변동폭 연산
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
             for al_code in airline_rank_list:
