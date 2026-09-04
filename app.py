@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 100% 파란색 알약 태그 박스/X/화살표 완벽 박멸 강력 CSS
+# 📌 파란색 태그 박스/X/화살표 100% 완전 파괴 CSS
 st.markdown("""
 <style>
     :root {
@@ -55,7 +55,6 @@ st.markdown("""
         --primaryColor: #0ea5e9 !important;
     }
     
-    /* 드롭다운 우측 푸른색 알약 박스 및 액션 영역 100% 완전 파기 */
     div[data-testid="stSelectbox"] span[data-baseweb="tag"],
     div[data-testid="stSelectbox"] div[data-baseweb="tag"],
     div[data-testid="stSelectbox"] [data-baseweb="tag"],
@@ -80,7 +79,6 @@ st.markdown("""
         border: none !important;
     }
 
-    /* 드롭다운 본체 외곽 회색 라인 및 깔끔 흰색 배경 고정 */
     div[data-testid="stSelectbox"],
     div[data-testid="stSelectbox"] *,
     div[data-testid="stSelectbox"] div,
@@ -1302,7 +1300,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (수치 2배 부풀림 완전 해결 및 정밀 YoY 연산)
+# GROUP 2: 🌐 6수송 대시보드 (금년 단일 슬라이싱 및 YOY 정확 연산)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1340,7 +1338,7 @@ else:
     val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else ('Flights' if 'Flights' in df_6.columns else df_6.columns[-1]))
     py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
 
-    # 📌 단일 해 수치 수식 개편 (중복합산으로 인한 2배 부풀림 완전 방지)
+    # 📌 단일 해 수치 중복합산 방지 파싱 (금년 2026년 레코드 고정 슬라이싱)
     df_6['Val_num'] = pd.to_numeric(df_6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     
     if py_col_6 and py_col_6 in df_6.columns:
@@ -1458,7 +1456,7 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425) 정밀 매칭
+    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425) 100% 매칭
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
@@ -1523,7 +1521,7 @@ else:
                 html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) -> 각 항공사별 M/S 변동폭 연산
+            # ROW 4: YOY (M/S %p) -> 각 항공사별 M/S 변동폭 독자 연산
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
             for al_code in airline_rank_list:
