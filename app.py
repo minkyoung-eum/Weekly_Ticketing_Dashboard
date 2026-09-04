@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 CSS Styling (1. 하늘색 전면 제거 & 깔끔한 테이블 스타일)
+# 📌 CSS Styling
 st.markdown("""
 <style>
     :root {
@@ -55,7 +55,7 @@ st.markdown("""
         --primaryColor: #0ea5e9 !important;
     }
     
-    /* 필터 내의 모든 하늘색 태그/배경 완벽 삭제 */
+    /* 필터 내부의 모든 하늘색 태그/배경 완벽 삭제 */
     span[data-baseweb="tag"],
     div[data-baseweb="tag"],
     div[data-baseweb="select"] span[data-baseweb="tag"],
@@ -67,6 +67,7 @@ st.markdown("""
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
+        color: inherit !important;
     }
 
     div[data-baseweb="select"] {
@@ -490,8 +491,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
-        full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
-        route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
+        # 📌 요청반영: KE 취항 여부 == '취항'인 노선 목록을 기본 노선 리스트로 설정
+        if ke_service_col and '취항' in all_ke_services:
+            ke_only_df = merged_df[merged_df[ke_service_col] == '취항']
+            route_order_sum = ke_only_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
+            route_order_list = [str(x) for x in route_order_sum.index.tolist() if str(x) != 'nan']
+        else:
+            full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
+            route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
         with st.expander("🔍 **발매 대시보드 검색 & 드롭다운 필터 설정** (클릭하여 여닫기)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
@@ -505,7 +512,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     selected = col_obj.selectbox(label, options=opts, index=0)
                     return full_list if selected == ALL_OPTION else [selected]
 
-                selected_routes = create_dropdown(f_col1, "1. 노선 (발매량 순 정렬)", route_order_list)
+                selected_routes = create_dropdown(f_col1, "1. 노선 (KE취항 우선 / 발매량순)", route_order_list)
                 selected_weeks = create_dropdown(f_col2, "2. 발매 주차 및 일자", all_issue_weeks) if week_col else []
                 
                 default_ke_idx = (all_ke_services.index("취항") + 1) if "취항" in all_ke_services else 0
@@ -588,7 +595,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 요청반영: BAR 상단에 총 발매량 및 KE M/S 점유율 별도 표기 및 깔끔 제목
                 if week_col and week_col in merged_df.columns:
                     st.subheader("📅 주차별 및 일자별 발매 실적 추이")
                     
@@ -743,7 +749,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭
+    # 2. ✈️ 공급 M/S 탭 (요청반영: 스케줄 타임라인 KE 막대 두꺼운 테두리 및 색상 강조)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -961,13 +967,20 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         )
                         fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                         fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
+                        
+                        # 📌 요청반영: 스케줄 타임라인 내 KE 막대에 두꺼운 테두리 및 색상 강하게 강조
+                        for trace in fig_timeline.data:
+                            if trace.name == 'KE':
+                                trace.marker.line.color = '#0284c7'
+                                trace.marker.line.width = 3
+
                         fig_timeline.update_traces(textposition='inside', hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{x}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>", customdata=df_schedule[['Seats_num']])
                         fig_timeline.update_layout(height=400, showlegend=True)
                         apply_bottom_legend(fig_timeline)
                         st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (요청반영 2: 아코디언 제거->통합테이블 & 3: 상위20개 대리점 정렬)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (요청반영: 아코디언 제거->단일테이블 & 상위 20개 대리점 하단 항공사 정렬)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -1019,9 +1032,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_ag_filtered = df_agency[mask_ag]
 
-        sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매 현황 (단일 테이블 구조)", "🏢 대리점별 판매현황 (상위 20개 대리점 / 항공사 정렬)"])
+        sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매 현황 (단일 통합 테이블)", "🏢 대리점별 판매현황 (상위 20개 대리점 / 항공사 정렬)"])
 
-        # 📌 요청반영 2: RBD별 판매 현황 아코디언 제거 및 하나의 단일 통합 테이블 전환
         with sub_tab_rbd:
             st.markdown("##### 📌 RBD 클래스 / 항공사별 / 주차별 발매 실적 현황")
             if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
@@ -1036,7 +1048,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 piv_single_rbd['총합계'] = piv_single_rbd.sum(axis=1)
                 piv_single_rbd = piv_single_rbd[piv_single_rbd['총합계'] > 0]
                 
-                # KE 우선 정렬
                 piv_single_rbd = piv_single_rbd.reset_index()
                 piv_single_rbd['is_ke'] = (piv_single_rbd['Dominant Marketing Airline'] == 'KE')
                 piv_single_rbd = piv_single_rbd.sort_values(by=['is_ke', '총합계'], ascending=[False, False]).drop(columns=['is_ke'])
@@ -1046,9 +1057,8 @@ if selected_group == "✈️ 3/4수송 대시보드":
             else:
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
-        # 📌 요청반영 3: 대리점별 판매현황 상위 20개 대리점 및 항공사별 정렬
         with sub_tab_agency:
-            st.markdown("##### 📌 상위 TOP 20 대리점별 / 항공사별 발매 현황")
+            st.markdown("##### 📌 상위 TOP 20 대리점별 / 하위 항공사별 발매 현황")
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
                 top_20_ag_names = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False).head(20).index.tolist()
                 df_top_20 = df_ag_filtered[df_ag_filtered['Travel Agency Name'].isin(top_20_ag_names)]
@@ -1064,7 +1074,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 piv_agency_20['총 판매량'] = piv_agency_20.sum(axis=1)
                 piv_agency_20 = piv_agency_20[piv_agency_20['총 판매량'] > 0]
                 
-                # 상위 20개 대리점 순서 유지 및 항공사별(KE 최우선) 정렬
                 piv_agency_20 = piv_agency_20.reset_index()
                 piv_agency_20['Travel Agency Name'] = pd.Categorical(piv_agency_20['Travel Agency Name'], categories=top_20_ag_names, ordered=True)
                 piv_agency_20['is_ke'] = (piv_agency_20['Dominant Marketing Airline'] == 'KE')
@@ -1169,7 +1178,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             observed=False
                         )
                         piv_grp_single['총합계'] = piv_grp_single.sum(axis=1)
-                        # 상위 50개 여행사 표출
                         piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(50)
 
                         g_html = '<div class="yoy-table-container"><table class="yoy-table">'
@@ -1444,7 +1452,6 @@ else:
             apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
-    # CARRIER별 M/S (TOP 30 O&D 상세) 정밀 보완
     with tab6_2:
         st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
         if not filtered_6.empty and od_col_6 in filtered_6.columns and al_col_6 in filtered_6.columns:
