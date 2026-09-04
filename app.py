@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 100% 하늘색 박스 & X 버튼 파괴 및 고급 CSS 서식
+# 📌 전역 CSS (드롭다운 X, 화살표 제거 & 피벗 테이블 깔끔 서식)
 st.markdown("""
 <style>
     :root {
@@ -55,32 +55,10 @@ st.markdown("""
         --primaryColor: #0ea5e9 !important;
     }
     
-    /* 1. 드롭다운(stSelectbox) 내부 파란색 태그 & X 아이콘 완벽 은폐 */
-    div[data-testid="stSelectbox"],
-    div[data-testid="stSelectbox"] *,
-    div[data-testid="stSelectbox"] div,
-    div[data-testid="stSelectbox"] span,
-    div[data-testid="stSelectbox"] button,
-    div[data-testid="stSelectbox"] [role="button"],
-    div[data-testid="stSelectbox"] [data-baseweb="select"],
-    div[data-testid="stSelectbox"] [aria-expanded],
-    div[data-baseweb="select"],
-    div[data-baseweb="select"] * {
-        background-color: #ffffff !important;
-        background: #ffffff !important;
-        box-shadow: none !important;
-    }
-    
-    div[data-testid="stSelectbox"] > div {
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-    }
-    
-    div[data-testid="stSelectbox"] svg {
-        fill: #64748b !important;
-        color: #64748b !important;
-    }
-
+    div[data-testid="stSelectbox"] svg,
+    div[data-testid="stSelectbox"] [data-baseweb="icon"],
+    div[data-baseweb="select"] svg,
+    div[data-baseweb="select"] [data-baseweb="icon"],
     span[data-baseweb="tag"],
     div[data-baseweb="tag"],
     [data-baseweb="tag"],
@@ -95,7 +73,24 @@ st.markdown("""
         padding: 0px !important;
     }
 
-    /* Radio / Toggle */
+    div[data-testid="stSelectbox"],
+    div[data-testid="stSelectbox"] *,
+    div[data-testid="stSelectbox"] div,
+    div[data-testid="stSelectbox"] span,
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] * {
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
+    }
+    
+    div[data-testid="stSelectbox"] > div,
+    div[data-baseweb="select"] > div {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+        padding-right: 8px !important;
+    }
+
     div[role="radiogroup"] label div[role="radio"][aria-checked="true"] {
         background-color: #0ea5e9 !important;
         border-color: #0ea5e9 !important;
@@ -108,7 +103,6 @@ st.markdown("""
         background-color: #0ea5e9 !important;
     }
 
-    /* Header & 카드 */
     .source-header-box {
         background-color: #f0f9ff;
         border-left: 5px solid #0284c7;
@@ -165,7 +159,6 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 필터 박스 프레임 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
@@ -175,7 +168,6 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
-    /* 필터 적용하기 버튼 */
     div[data-testid="stForm"] div.stButton {
         display: flex !important;
         justify-content: center !important;
@@ -204,7 +196,6 @@ st.markdown("""
         background-color: #0284c7 !important;
     }
 
-    /* 📌 커스텀 피벗 테이블 서식 (이미지 매칭) */
     .custom-piv-container {
         width: 100%;
         overflow-x: auto;
@@ -243,7 +234,6 @@ st.markdown("""
         color: #334155;
     }
 
-    /* 📌 6수송 피팅 테이블 서식 */
     .yoy-table-container {
         width: 100%;
         max-height: 650px;
@@ -403,7 +393,6 @@ df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
 
-# 📌 가중치 병합 로직 (KeyError 예방)
 @st.cache_data(max_entries=2, ttl=3600)
 def process_iss_merged(df_iss, df_wt):
     if df_iss is None or df_wt is None:
@@ -494,7 +483,6 @@ selected_group = st.radio(
 
 ALL_OPTION = "전체 (All)"
 
-# 📌 스케줄 타임라인 전용 색상 맵 (대한항공 KE만 스카이블루, 타 항공사 채도 다운)
 timeline_color_map = {
     'KE': '#00A1E9',
     'OZ': '#cbd5e1',
@@ -558,7 +546,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df = process_iss_merged(df_iss_raw, df_wt_raw)
 
-        # 📌 KE 취항 노선 전용 자동 고정 마스크 적용
+        # KE 취항 노선 전용 자동 고정 마스크
         ke_service_col = 'KE취항여부' if 'KE취항여부' in merged_df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in merged_df.columns else None)
         if ke_service_col:
             merged_df = merged_df[merged_df[ke_service_col].astype(str) == '취항']
@@ -607,7 +595,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.form_submit_button("🚀 발매 필터 적용하기")
 
-        # 마스크 개편 (ALL_OPTION 분기 처리)
         filter_mask = pd.Series(True, index=merged_df.index)
         if sel_route_str != ALL_OPTION: filter_mask &= (merged_df['노선'].astype(str) == sel_route_str)
         if sel_al_str != ALL_OPTION: filter_mask &= (merged_df['Dominant Marketing Airline'].astype(str) == sel_al_str)
@@ -981,7 +968,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_s4)
                     st.plotly_chart(fig_s4, width="stretch")
 
-            # 📌 요청반영: KE 외곽 테두리선 제거 및 무채색 대비 입체 강조
             st.markdown("---")
             st.subheader("✈️ 항공사별 스케줄 타임라인")
             
@@ -1315,7 +1301,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (정밀 독립 YoY 연산 및 과집계 방지)
+# GROUP 2: 🌐 6수송 대시보드 (2026년 고정 및 이미지 정밀 수치 동기화 연산)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1374,15 +1360,18 @@ else:
     else:
         sorted_6th_airlines = []
 
-    # 📌 6수송 라디오 필터 + 드롭다운 구성 (4.OD RGN 컬럼 매핑 적용)
+    # 📌 2026년 데이터만 필터 옵션으로 정제
+    all_raw_m = sorted([str(x) for x in df_6[month_col_6].dropna().unique()]) if month_col_6 in df_6.columns else []
+    months_2026_only = [m for m in all_raw_m if '2026' in m or '26' in m]
+    valid_6_months = months_2026_only if months_2026_only else all_raw_m
+
     with st.expander("🔍 **6수송 대시보드 검색 & 필터 설정** (클릭하여 여닫기)", expanded=True):
         with st.form("filter_6th_form_top"):
             
             st.markdown("##### 📌 주요 분석 선택 필터")
             r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns(5)
             
-            all_m_6 = sorted([str(x) for x in df_6[month_col_6].dropna().unique()]) if month_col_6 in df_6.columns else []
-            sel_6_month = r_col1.radio("1. TRIP MONTH", options=[ALL_OPTION] + all_m_6, index=0)
+            sel_6_month = r_col1.radio("1. TRIP MONTH (2026년)", options=[ALL_OPTION] + valid_6_months, index=0)
 
             act_dir_c = actual_cols['DIRECTION']
             all_dir_6 = sorted([str(x) for x in df_6[act_dir_c].dropna().unique()]) if act_dir_c in df_6.columns else []
@@ -1423,9 +1412,14 @@ else:
 
             st.form_submit_button("🚀 6수송 필터 적용하기")
 
-    # 마스크 결합 연산
+    # 마스크 결합 연산 (필터 적용시)
     mask_6_base = pd.Series(True, index=df_6.index)
-    if month_col_6 in df_6.columns and sel_6_month != ALL_OPTION: mask_6_base &= (df_6[month_col_6].astype(str) == sel_6_month)
+    if month_col_6 in df_6.columns and sel_6_month != ALL_OPTION:
+        mask_6_base &= (df_6[month_col_6].astype(str) == sel_6_month)
+    elif months_2026_only:
+        # 월 미선택시 2026년 전체월 적용
+        mask_6_base &= (df_6[month_col_6].astype(str).isin(months_2026_only))
+
     if actual_cols['DIRECTION'] and sel_6_dir != ALL_OPTION: mask_6_base &= (df_6[actual_cols['DIRECTION']].astype(str) == sel_6_dir)
     if actual_cols['STOP OVER'] and sel_6_stop != ALL_OPTION: mask_6_base &= (df_6[actual_cols['STOP OVER']].astype(str) == sel_6_stop)
     if actual_cols['4.OD RGN'] and sel_6_region != ALL_OPTION: mask_6_base &= (df_6[actual_cols['4.OD RGN']].astype(str) == sel_6_region)
@@ -1468,7 +1462,7 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 개별 항공사 독립 YoY 수치 산출 연산
+    # 📌 검증 표 이미지 수치 일치 정밀 집계 연산
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
@@ -1509,8 +1503,8 @@ else:
                 html_table += f'<td{cell_class}><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # ROW 2: YOY (발매) -> 항공사별 독자 연산
-            html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY (발매)</td>'
+            # ROW 2: YOY (발매) -> 항공사별 독립 연산
+            html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             t_yoy_icon = f'<span class="yoy-up">▲ {t_yoy_pct:.0f}%</span>' if t_yoy_pct >= 0 else f'<span class="yoy-down">▼ {abs(t_yoy_pct):.0f}%</span>'
             html_table += f'<td>{t_yoy_icon}</td>'
             for al_code in airline_rank_list:
@@ -1530,11 +1524,11 @@ else:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 ms_val = (c_val / t_curr * 100) if t_curr > 0 else 0
                 cell_class = ' class="ke-cell"' if al_code == 'KE' else ''
-                html_table += f'<td{cell_class}><b>{ms_val:.1f}%</b></td>'
+                html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) -> 항공사별 M/S 변동폭 독자 연산
-            html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY (M/S %p)</td>'
+            # ROW 4: YOY (M/S %p) -> 항공사별 M/S 변동폭 연산
+            html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
             for al_code in airline_rank_list:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
@@ -1542,7 +1536,7 @@ else:
                 ms_c = (c_val / t_curr * 100) if t_curr > 0 else 0
                 ms_p = (p_val / t_prev * 100) if t_prev > 0 else 0
                 diff_p = ms_c - ms_p
-                icon_p = f'<span class="yoy-up">▲ {diff_p:.1f}%p</span>' if diff_p >= 0 else f'<span class="yoy-down">▼ {abs(diff_p):.1f}%p</span>'
+                icon_p = f'<span class="yoy-up">▲ {diff_p:.0f}%p</span>' if diff_p >= 0 else f'<span class="yoy-down">▼ {abs(diff_p):.0f}%p</span>'
                 cell_class = ' class="ke-cell"' if al_code == 'KE' else ''
                 html_table += f'<td{cell_class}>{icon_p}</td>'
             html_table += '</tr>'
