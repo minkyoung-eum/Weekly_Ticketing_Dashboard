@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 CSS Styling (필터 우측 하늘색 색상 완벽 제거 및 단정 스타일)
+# 📌 CSS Styling (하늘색 태그 박스 완벽 은폐 & 단정 드롭다운)
 st.markdown("""
 <style>
     :root {
@@ -55,6 +55,19 @@ st.markdown("""
         --primaryColor: #0ea5e9 !important;
     }
     
+    /* 📌 문제의 하늘색 태그 박스 요소 전면 숨김/은폐 처리 */
+    span[data-baseweb="tag"],
+    div[data-baseweb="tag"],
+    [data-baseweb="tag"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
     div[role="radiogroup"] label div[role="radio"][aria-checked="true"] {
         background-color: #0ea5e9 !important;
         border-color: #0ea5e9 !important;
@@ -67,19 +80,6 @@ st.markdown("""
     
     div[data-testid="stToggle"] input:checked + div {
         background-color: #0ea5e9 !important;
-    }
-
-    /* 📌 필터 내부의 모든 하늘색 태그/배경 완벽 삭제 및 깔끔 투명화 */
-    div[data-baseweb="select"] span[data-baseweb="tag"],
-    div[data-baseweb="select"] div[data-baseweb="tag"],
-    div[data-testid="stMultiSelect"] span[data-baseweb="tag"],
-    span[data-baseweb="tag"],
-    div[data-baseweb="tag"] {
-        background-color: transparent !important;
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: inherit !important;
     }
 
     div[data-baseweb="select"] {
@@ -144,6 +144,7 @@ st.markdown("""
         border-radius: 4px;
     }
 
+    /* 필터 박스 프레임 */
     [data-testid="stForm"] {
         background-color: #ffffff !important;
         border: 1px solid #e2e8f0 !important;
@@ -153,6 +154,7 @@ st.markdown("""
         margin-bottom: 20px !important;
     }
     
+    /* 필터 적용하기 버튼: 가운데 정렬, 단정 파란색 버튼 */
     div[data-testid="stForm"] div.stButton {
         display: flex !important;
         justify-content: center !important;
@@ -497,6 +499,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             with st.form("iss_filter_form_top"):
                 f_col1, f_col2, f_col3, f_col4 = st.columns(4)
                 
+                # 📌 단일 선택 st.selectbox 드롭다운으로 태그 박스 완전 차단
                 def create_dropdown(col_obj, label, full_list):
                     opts = [ALL_OPTION] + full_list
                     selected = col_obj.selectbox(label, options=opts, index=0)
@@ -585,7 +588,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
-                # 📌 요청반영: 발매주차별/일자별 항공사 발매량 그래프 (BAR 상단에 KE M/S 점유율 표기 및 제목 문구 정리)
+                # 📌 요청반영: BAR 상단 총 발매량 + KE M/S 점유율 표기 및 깔끔 제목
                 if week_col and week_col in merged_df.columns:
                     st.subheader("📅 주차별 및 일자별 발매 실적 추이")
                     
@@ -602,10 +605,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         week_totals = week_al_grp.groupby(week_col, observed=False)[val_col].sum().reset_index()
                         week_totals_dict = dict(zip(week_totals[week_col].astype(str), week_totals[val_col]))
 
-                        # 항공사별 M/S 점유비 계산 (특히 KE)
                         ke_week_grp = week_al_grp[week_al_grp['Dominant Marketing Airline'] == 'KE'].set_index(week_col)[val_col].to_dict()
 
                         week_al_grp['Week_Total'] = week_al_grp[week_col].map(week_totals_dict)
+                        
                         week_tot_num = pd.to_numeric(week_al_grp['Week_Total'], errors='coerce').fillna(0)
                         val_col_num = pd.to_numeric(week_al_grp[val_col], errors='coerce').fillna(0)
                         week_al_grp['MS_Percent'] = np.where(week_tot_num > 0, (val_col_num / week_tot_num) * 100, 0)
@@ -627,7 +630,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                         valid_weeks = [w for w in all_issue_weeks if w in week_totals_dict]
                         
-                        # 📌 BAR 상단에 총 발매량 및 KE M/S 점유율 별도 표기
                         top_bar_labels = []
                         for w in valid_weeks:
                             tot_val = week_totals_dict.get(w, 0)
@@ -1048,7 +1050,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             )
                             piv_al_rbd['총합계'] = piv_al_rbd.sum(axis=1)
                             
-                            # 📌 요청반영: 값이 없는(총합계가 0인) RBD 클래스 행 자동 삭제
+                            # 📌 요청반영: 값이 없는(총합계가 0인) RBD 클래스 행 완벽 삭제
                             piv_al_rbd = piv_al_rbd[piv_al_rbd['총합계'] > 0]
                             
                             if al_code in RBD_HIERARCHY:
@@ -1087,9 +1089,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
             else:
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
-        # ② 대리점별 판매현황 (요청반영: 대리점 상위 20개 하단 주차별/항공사별 판매 그래프 추가)
+        # ② 대리점별 판매현황 (요청반영: 대리점 상위 20개 하단 주차별/항공사별 판매 그래프 신설)
         with sub_tab_agency:
-            st.markdown("##### 📌 주차별 / 대리점별 / 항공사별 판매현황")
+            st.markdown("##### 📌 주차별 / 대리점별 / 항공사별 판매현황 (상위 200개 대리점 표출)")
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
                 piv_agency = df_ag_filtered.pivot_table(
                     index=['Travel Agency Name', 'Dominant Marketing Airline'],
@@ -1225,7 +1227,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             observed=False
                         )
                         piv_grp_single['총합계'] = piv_grp_single.sum(axis=1)
-                        # 📌 요청반영: 상위 50개 여행사만 표출
+                        # 📌 상위 50개 여행사 표출
                         piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(50)
 
                         g_html = '<div class="yoy-table-container"><table class="yoy-table">'
@@ -1500,7 +1502,6 @@ else:
             apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
-    # CARRIER별 M/S (TOP 30 O&D 상세) 정밀 보완
     with tab6_2:
         st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
         if not filtered_6.empty and od_col_6 in filtered_6.columns and al_col_6 in filtered_6.columns:
