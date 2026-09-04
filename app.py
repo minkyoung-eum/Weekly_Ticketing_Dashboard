@@ -47,24 +47,40 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 드롭다운 내부 'X' (Clear 아이콘) 및 하늘색 박스 100% 완전 파기 CSS
+# 📌 CSS Styling (드롭다운 파란색/X버튼 완벽 파괴 & 고급 테이블/카드 스타일)
 st.markdown("""
 <style>
-    /* 1. Streamlit 전역 primaryColor 오버라이드 */
-    :root {
-        --primary-color: #0ea5e9 !important;
-        --primaryColor: #0ea5e9 !important;
+    /* 1. 드롭다운 박스 전체 외곽 틀 (흰색 배경 + 연회색 테두리) */
+    div[data-testid="stSelectbox"],
+    div[data-testid="stSelectbox"] *,
+    div[data-testid="stSelectbox"] div,
+    div[data-testid="stSelectbox"] span,
+    div[data-testid="stSelectbox"] button,
+    div[data-testid="stSelectbox"] [role="button"],
+    div[data-testid="stSelectbox"] [data-baseweb="select"],
+    div[data-testid="stSelectbox"] [aria-expanded],
+    div[data-baseweb="select"],
+    div[data-baseweb="select"] * {
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        box-shadow: none !important;
     }
     
-    /* 2. 📌 핵심: 드롭다운 내 'X' 이미지/버튼/아이콘 및 하늘색 태그 완벽 은폐 */
-    div[data-baseweb="select"] span[data-baseweb="tag"],
-    div[data-baseweb="select"] div[data-baseweb="tag"],
-    div[data-baseweb="select"] button,
-    div[data-baseweb="select"] svg,
-    div[data-baseweb="select"] [aria-label="Clear"],
-    div[data-baseweb="tag"],
+    div[data-testid="stSelectbox"] > div {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+    }
+    
+    div[data-testid="stSelectbox"] svg {
+        fill: #64748b !important;
+        color: #64748b !important;
+    }
+
+    /* 2. 드롭다운 우측 X 아이콘 및 하늘색 태그 완벽 은폐 */
     span[data-baseweb="tag"],
-    [data-baseweb="tag"] {
+    div[data-baseweb="tag"],
+    [data-baseweb="tag"],
+    div[data-baseweb="select"] [aria-label="Clear"] {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
@@ -72,26 +88,6 @@ st.markdown("""
         height: 0px !important;
         margin: 0px !important;
         padding: 0px !important;
-        background: transparent !important;
-        background-color: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-    }
-
-    /* 3. Selectbox 외곽 틀 깔끔 무채색 보정 */
-    div[data-testid="stSelectbox"] > div,
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-    }
-    
-    div[data-baseweb="select"] input {
-        background-color: transparent !important;
-    }
-    
-    div[data-baseweb="select"]:focus-within > div {
-        border-color: #0ea5e9 !important;
     }
 
     /* Radio / Toggle */
@@ -201,83 +197,46 @@ st.markdown("""
         background-color: #0284c7 !important;
     }
 
-    /* Table Styling */
-    .yoy-table-container {
+    /* 📌 커스텀 피벗 테이블 디자인 (이미지 매칭) */
+    .custom-piv-container {
         width: 100%;
         overflow-x: auto;
         margin-bottom: 25px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
     }
-    .yoy-table {
+    .custom-piv-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
-        text-align: center;
         background-color: #ffffff;
     }
-    .yoy-table th {
-        padding: 10px 8px;
-        border: 1px solid #cbd5e1;
+    .custom-piv-table th.header-main {
+        background-color: #3b6998 !important;
+        color: #ffffff !important;
         font-weight: 700;
-        white-space: nowrap;
+        padding: 10px;
+        border: 1px solid #2d527c;
+        text-align: center;
     }
-    .yoy-table th.mkt-header {
-        background-color: #2b579a !important;
-        color: #ffffff !important;
+    .custom-piv-table tr.row-group-header {
+        background-color: #dbeafe !important;
+        font-weight: 800;
+        color: #0f172a;
     }
-    .yoy-table th.carrier-header {
-        background-color: #0284c7 !important;
-        color: #ffffff !important;
+    .custom-piv-table tr.row-group-header td {
+        padding: 8px 12px;
+        border-top: 1.5px solid #93c5fd;
+        border-bottom: 1.5px solid #93c5fd;
     }
-    .yoy-table th.ke-header {
-        background-color: #059669 !important;
-        color: #ffffff !important;
-        font-size: 14px !important;
-        font-weight: 800 !important;
-    }
-    .yoy-table td {
-        padding: 8px 10px;
+    .custom-piv-table td {
+        padding: 6px 12px;
         border: 1px solid #e2e8f0;
-        white-space: nowrap;
         color: #334155;
     }
-    .yoy-table td.ke-cell, .yoy-table tr.ke-row {
-        background-color: #ecfdf5 !important;
-        font-weight: 800 !important;
-        color: #047857 !important;
-    }
-    .yoy-table tr:hover {
-        background-color: #f8fafc !important;
-    }
-    .yoy-table tr.row-title {
-        background-color: #f1f5f9;
-        font-weight: bold;
-        color: #0f172a;
-    }
-    .yoy-table tr.row-summary {
-        background-color: #e2e8f0;
-        font-weight: bold;
-        color: #0f172a;
-    }
-    .yoy-up {
-        color: #16a34a;
-        font-weight: 700;
-    }
-    .yoy-down {
-        color: #dc2626;
-        font-weight: 700;
-    }
-
-    .ke-timeline-box {
-        background-color: #f0f9ff;
-        border: 2px solid #0ea5e9;
-        border-radius: 8px;
-        padding: 12px 18px;
-        margin-bottom: 15px;
-        color: #0369a1;
-        font-weight: 600;
-        font-size: 15px;
+    .custom-piv-table td.col-subtext {
+        color: #64748b;
+        font-size: 12px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -436,7 +395,22 @@ selected_group = st.radio(
 )
 
 ALL_OPTION = "전체 (All)"
-color_discrete_map = {'KE': '#00A1E9'}
+
+# 📌 스케줄 타임라인 전용 색상 맵 (대한항공 KE만 스카이블루, 타 항공사 연회색/쿨그레이 톤으로 채도 다운)
+color_discrete_map = {
+    'KE': '#00A1E9',
+    'OZ': '#cbd5e1',
+    '7C': '#94a3b8',
+    'LJ': '#cbd5e1',
+    'TW': '#94a3b8',
+    'BX': '#cbd5e1',
+    'RS': '#94a3b8',
+    'JL': '#cbd5e1',
+    'NH': '#94a3b8',
+    'YP': '#cbd5e1',
+    'ZE': '#94a3b8',
+    'WE': '#cbd5e1'
+}
 
 def apply_bottom_legend(fig):
     fig.update_layout(
@@ -507,6 +481,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_airlines = sorted([str(x) for x in merged_df['Dominant Marketing Airline'].dropna().unique()])
         all_airlines = ['KE'] + [x for x in raw_airlines if x != 'KE'] if 'KE' in raw_airlines else raw_airlines
 
+        # 📌 KE 취항 여부 == '취항'인 노선 목록을 기본 노선 리스트로 설정
         if ke_service_col and '취항' in all_ke_services:
             ke_only_df = merged_df[merged_df[ke_service_col] == '취항']
             route_order_sum = ke_only_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
@@ -610,6 +585,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
                 st.markdown("---")
                 
+                # 📌 BAR 상단에 총 발매량 + KE M/S 점유율 표기 및 깔끔 제목
                 if week_col and week_col in merged_df.columns:
                     st.subheader("📅 주차별 및 일자별 발매 실적 추이")
                     
@@ -764,7 +740,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭
+    # 2. ✈️ 공급 M/S 탭 (스케줄 타임라인 KE 막대 두꺼운 테두리 및 색상 강조)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -983,11 +959,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                         fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
                         
-                        # 📌 KE 막대에 두꺼운 테두리 및 강한 색상 강조
+                        # 📌 KE 막대 두꺼운 테두리 및 강한 스카이블루 강조
                         for trace in fig_timeline.data:
                             if trace.name == 'KE':
                                 trace.marker.line.color = '#0284c7'
-                                trace.marker.line.width = 3
+                                trace.marker.line.width = 3.5
 
                         fig_timeline.update_traces(textposition='inside', hovertemplate="<b>항공사: %{y}</b><br>출발시각: %{x}<br>공급석: %{customdata[0]:,.0f}석<extra></extra>", customdata=df_schedule[['Seats_num']])
                         fig_timeline.update_layout(height=400, showlegend=True)
@@ -995,7 +971,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (이미지 레이아웃 피벗 테이블 구현)
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -1047,55 +1023,117 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_ag_filtered = df_agency[mask_ag]
 
-        sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매 현황 (단일 통합 테이블)", "🏢 대리점별 판매현황 (상위 20개 대리점 / 항공사 정렬)"])
+        sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
 
+        # 📌 1. RBD별 판매현황 (이미지 기반 예쁜 HTML 커스텀 테이블)
         with sub_tab_rbd:
-            st.markdown("##### 📌 RBD 클래스 / 항공사별 / 주차별 발매 실적 현황")
             if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
-                piv_single_rbd = df_ag_filtered.pivot_table(
-                    index=['O&D RBKD', 'Dominant Marketing Airline'],
-                    columns=week_col_a,
-                    values='Value',
-                    aggfunc='sum',
-                    fill_value=0,
-                    observed=False
-                )
-                piv_single_rbd['총합계'] = piv_single_rbd.sum(axis=1)
-                piv_single_rbd = piv_single_rbd[piv_single_rbd['총합계'] > 0]
+                week_list = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
                 
-                piv_single_rbd = piv_single_rbd.reset_index()
-                piv_single_rbd['is_ke'] = (piv_single_rbd['Dominant Marketing Airline'] == 'KE')
-                piv_single_rbd = piv_single_rbd.sort_values(by=['is_ke', '총합계'], ascending=[False, False]).drop(columns=['is_ke'])
-                piv_single_rbd = piv_single_rbd.set_index(['O&D RBKD', 'Dominant Marketing Airline'])
+                # 항공사 순서 정렬 (KE 최우선)
+                ag_al_sum = df_ag_filtered.groupby('Dominant Marketing Airline', observed=False)['Value'].sum().sort_values(ascending=False)
+                ag_al_list = [str(x) for x in ag_al_sum.index if ag_al_sum[x] > 0]
+                if 'KE' in ag_al_list:
+                    ag_al_list.remove('KE')
+                    ag_al_list = ['KE'] + ag_al_list
 
-                st.dataframe(piv_single_rbd.map(lambda x: f"{x:,.0f}" if pd.notnull(x) and x > 0 else "-"), width="stretch")
+                rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
+                rbd_html += '<thead><tr>'
+                rbd_html += '<th class="header-main" style="width:180px; text-align:left; padding-left:15px;">RBD별</th>'
+                for wk in week_list:
+                    rbd_html += f'<th class="header-main">{wk}</th>'
+                rbd_html += '<th class="header-main" style="background-color:#2b579a !important;">총합계</th></tr></thead><tbody>'
+
+                for al_code in ag_al_list:
+                    al_sub = df_ag_filtered[df_ag_filtered['Dominant Marketing Airline'] == al_code]
+                    al_tot_pax = al_sub['Value'].sum()
+                    
+                    if al_tot_pax > 0:
+                        # 요약 행 (연파란색 배경)
+                        rbd_html += '<tr class="row-group-header">'
+                        rbd_html += f'<td style="text-align:left; padding-left:15px; font-weight:800;">{al_code}</td>'
+                        for wk in week_list:
+                            wk_val = al_sub[al_sub[week_col_a].astype(str) == wk]['Value'].sum()
+                            rbd_html += f'<td style="text-align:right; padding-right:15px; font-weight:800;">{wk_val:,.0f}</td>'
+                        rbd_html += f'<td style="text-align:right; padding-right:15px; font-weight:800; background-color:#bfdbfe;">{al_tot_pax:,.0f}</td></tr>'
+
+                        piv_rbd = al_sub.pivot_table(index='O&D RBKD', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
+                        piv_rbd['총합계'] = piv_rbd.sum(axis=1)
+                        piv_rbd = piv_rbd[piv_rbd['총합계'] > 0]
+
+                        if al_code in RBD_HIERARCHY:
+                            hierarchy_order = RBD_HIERARCHY[al_code]
+                            existing_rbds = piv_rbd.index.tolist()
+                            sorted_rbds = [r for r in hierarchy_order if r in existing_rbds] + [r for r in existing_rbds if r not in hierarchy_order]
+                            piv_rbd = piv_rbd.loc[sorted_rbds]
+                        else:
+                            piv_rbd = piv_rbd.sort_values(by='총합계', ascending=False)
+
+                        for rbd_code, rbd_row in piv_rbd.iterrows():
+                            rbd_html += f'<tr><td style="text-align:left; padding-left:35px; font-weight:600; color:#475569;">{rbd_code}</td>'
+                            for wk in week_list:
+                                v_num = rbd_row[wk] if wk in rbd_row else 0
+                                v_str = f"{v_num:,.0f}" if v_num > 0 else ""
+                                rbd_html += f'<td style="text-align:right; padding-right:15px;">{v_str}</td>'
+                            tot_v = rbd_row['총합계']
+                            rbd_html += f'<td style="text-align:right; padding-right:15px; font-weight:700; background-color:#f1f5f9;">{tot_v:,.0f}</td></tr>'
+
+                rbd_html += '</tbody></table></div>'
+                st.markdown(rbd_html, unsafe_allow_html=True)
             else:
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
+        # 📌 2. 대리점별 판매현황 (상위 20개 대리점 / 이미지 기반 예쁜 계층형 HTML 테이블)
         with sub_tab_agency:
-            st.markdown("##### 📌 상위 TOP 20 대리점별 / 하위 항공사별 발매 현황")
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
-                top_20_ag_names = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False).head(20).index.tolist()
-                df_top_20 = df_ag_filtered[df_ag_filtered['Travel Agency Name'].isin(top_20_ag_names)]
+                week_list_ag = sorted([str(x) for x in df_ag_filtered[week_col_a].dropna().unique()], reverse=True)
+                top_20_agencies = df_ag_filtered.groupby('Travel Agency Name', observed=False)['Value'].sum().sort_values(ascending=False).head(20).index.tolist()
 
-                piv_agency_20 = df_top_20.pivot_table(
-                    index=['Travel Agency Name', 'Dominant Marketing Airline'],
-                    columns=week_col_a,
-                    values='Value',
-                    aggfunc='sum',
-                    fill_value=0,
-                    observed=False
-                )
-                piv_agency_20['총 판매량'] = piv_agency_20.sum(axis=1)
-                piv_agency_20 = piv_agency_20[piv_agency_20['총 판매량'] > 0]
-                
-                piv_agency_20 = piv_agency_20.reset_index()
-                piv_agency_20['Travel Agency Name'] = pd.Categorical(piv_agency_20['Travel Agency Name'], categories=top_20_ag_names, ordered=True)
-                piv_agency_20['is_ke'] = (piv_agency_20['Dominant Marketing Airline'] == 'KE')
-                piv_agency_20 = piv_agency_20.sort_values(by=['Travel Agency Name', 'is_ke', '총 판매량'], ascending=[True, False, False]).drop(columns=['is_ke'])
-                piv_agency_20 = piv_agency_20.set_index(['Travel Agency Name', 'Dominant Marketing Airline'])
+                ag_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
+                ag_html += '<thead><tr>'
+                ag_html += '<th class="header-main" style="width:240px; text-align:left; padding-left:15px;">대리점명 / 항공사</th>'
+                for wk in week_list_ag:
+                    ag_html += f'<th class="header-main">{wk}</th>'
+                ag_html += '<th class="header-main" style="background-color:#2b579a !important;">총 판매량</th></tr></thead><tbody>'
 
-                st.dataframe(piv_agency_20.map(lambda x: f"{x:,.0f}" if pd.notnull(x) and x > 0 else "-"), width="stretch")
+                for ag_name in top_20_agencies:
+                    ag_sub = df_ag_filtered[df_ag_filtered['Travel Agency Name'] == ag_name]
+                    ag_tot_val = ag_sub['Value'].sum()
+
+                    if ag_tot_val > 0:
+                        # 대리점 요약 행 (연파란색 배경)
+                        ag_html += '<tr class="row-group-header">'
+                        ag_html += f'<td style="text-align:left; padding-left:15px; font-weight:800;">{ag_name}</td>'
+                        for wk in week_list_ag:
+                            wk_v = ag_sub[ag_sub[week_col_a].astype(str) == wk]['Value'].sum()
+                            ag_html += f'<td style="text-align:right; padding-right:15px; font-weight:800;">{wk_v:,.0f}</td>'
+                        ag_html += f'<td style="text-align:right; padding-right:15px; font-weight:800; background-color:#bfdbfe;">{ag_tot_val:,.0f}</td></tr>'
+
+                        # 하위 항공사 행 정렬 (KE 최우선)
+                        piv_ag_sub = ag_sub.pivot_table(index='Dominant Marketing Airline', columns=week_col_a, values='Value', aggfunc='sum', fill_value=0, observed=False)
+                        piv_ag_sub['총합계'] = piv_ag_sub.sum(axis=1)
+                        piv_ag_sub = piv_ag_sub[piv_ag_sub['총합계'] > 0]
+
+                        piv_ag_sub = piv_ag_sub.reset_index()
+                        piv_ag_sub['is_ke'] = (piv_ag_sub['Dominant Marketing Airline'] == 'KE')
+                        piv_ag_sub = piv_ag_sub.sort_values(by=['is_ke', '총합계'], ascending=[False, False]).drop(columns=['is_ke'])
+                        piv_ag_sub = piv_ag_sub.set_index('Dominant Marketing Airline')
+
+                        for al_code, al_row in piv_ag_sub.iterrows():
+                            is_ke_flag = (al_code == 'KE')
+                            cell_style = 'font-weight:700; color:#0284c7;' if is_ke_flag else 'color:#475569;'
+                            
+                            ag_html += f'<tr><td style="text-align:left; padding-left:35px; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
+                            for wk in week_list_ag:
+                                v_num = al_row[wk] if wk in al_row else 0
+                                v_str = f"{v_num:,.0f}" if v_num > 0 else ""
+                                ag_html += f'<td style="text-align:right; padding-right:15px; {cell_style}">{v_str}</td>'
+                            tot_v = al_row['총합계']
+                            ag_html += f'<td style="text-align:right; padding-right:15px; font-weight:700; background-color:#f1f5f9; {cell_style}">{tot_v:,.0f}</td></tr>'
+
+                ag_html += '</tbody></table></div>'
+                st.markdown(ag_html, unsafe_allow_html=True)
+
             else:
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
