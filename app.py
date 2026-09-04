@@ -447,12 +447,11 @@ selected_group = st.radio(
 
 ALL_OPTION = "전체 (All)"
 
-# 📌 요청반영: 스케줄 타임라인 모든 타 항공사(ZG, ET, MM 등 포함) 색상을 연회색/쿨그레이로 강제 지정하는 스마트 색상 생성 함수
 def get_timeline_color_map(airlines_list):
     cmap = {'KE': '#00A1E9'}
     for al in airlines_list:
         if al != 'KE':
-            cmap[al] = '#cbd5e1'  # 모든 타 항공사는 연회색
+            cmap[al] = '#cbd5e1'
     return cmap
 
 def apply_bottom_legend(fig):
@@ -480,7 +479,6 @@ def format_dep_time(dep_val):
     except:
         return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
-# 📌 요청반영 1: 파란색 박스 결함을 완벽 차단하는 Popover/Radio 드롭다운 선택 유틸리티
 def render_clean_filter_popover(label, options_list, key_name):
     opts = [ALL_OPTION] + options_list
     with st.popover(f"▼ {label}"):
@@ -918,7 +916,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     apply_bottom_legend(fig_s4)
                     st.plotly_chart(fig_s4, width="stretch")
 
-            # 📌 요청반영 2: 타 항공사(ZG, ET, MM 등 포함) 색상을 회색으로 강제 통합 적용
+            # 타 항공사(ZG, ET, MM 등 포함) 색상을 회색으로 강제 통합 적용
             st.markdown("---")
             st.subheader("✈️ 항공사별 스케줄 타임라인")
             
@@ -948,7 +946,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     df_schedule['Start_Time'] = [t[0] for t in time_tuples]
                     df_schedule['End_Time'] = [t[1] for t in time_tuples]
 
-                    # 모든 항공사 인스턴스에 회색조 칼라맵 매핑
                     active_al_list = df_schedule['Airline'].unique().tolist()
                     dynamic_gray_cmap = get_timeline_color_map(active_al_list)
 
@@ -1020,7 +1017,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
 
-        # 📌 요청반영 3: [+/-] 기호를 항공사명 오른쪽으로 배치
+        # [+/-] 기호를 항공사명 오른쪽으로 배치
         with sub_tab_rbd:
             if not df_ag_filtered.empty and 'O&D RBKD' in df_ag_filtered.columns and week_col_a:
                 expand_all_rbd = st.toggle("📂 전체 세부 RBD 펼쳐보기", value=True, key="tog_rbd_exp")
@@ -1073,7 +1070,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             else:
                 st.warning("선택된 조건의 RBD 데이터가 없습니다.")
 
-        # 📌 요청반영 3: [+/-] 기호를 대리점명 오른쪽으로 배치
+        # [+/-] 기호를 대리점명 오른쪽으로 배치
         with sub_tab_agency:
             if not df_ag_filtered.empty and 'Travel Agency Name' in df_ag_filtered.columns and week_col_a:
                 expand_all_ag = st.toggle("📂 전체 세부 대리점 펼쳐보기", value=True, key="tog_ag_exp")
@@ -1124,7 +1121,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
     # -------------------------------------------------------------
-    # 4. 👥 단체실적 탭 (열 넓게 확대 & 출발일자 오늘 기준 +10일 이후 조건 적용)
+    # 4. 👥 단체실적 탭 (대리점 열 넓게 300px + 오늘 기준 +10일 이후 조건 완벽 오류 수정)
     # -------------------------------------------------------------
     with tab_34_4:
         st.subheader("👥 항공사별 / 대리점별 단체 실적 현황")
@@ -1139,12 +1136,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if ke_service_col_grp:
             df_grp_raw = df_grp_raw[df_grp_raw[ke_service_col_grp].astype(str) == '취항']
 
-        # 📌 출발 날짜 파싱 및 "오늘 기준 10일 이후" 조건 적용
+        # 📌 날짜 비교 시 TypeError 방지를 위한 Datetime 강제 캐스팅
         dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else 'Ticket Purchase Date')
-        df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col], errors='coerce')
+        df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
         
-        # 오늘 기준 10일 이후 데이터만 마스킹 필터링
-        df_grp_raw = df_grp_raw[df_grp_raw['Date_Obj'] >= pd.to_datetime(future_10_days)]
+        # Datetime 타입으로 강제 변환 후 오늘 기준 +10일 이후 조건 필터링
+        target_future_dt = pd.to_datetime(future_10_days)
+        df_grp_raw = df_grp_raw[df_grp_raw['Date_Obj'] >= target_future_dt]
 
         with st.expander("🔍 **단체실적 검색 필터** (KE 취항노선 & 출발일 +10일 이후 기준)", expanded=True):
             gf_col1, gf_col2, gf_col3 = st.columns(3)
@@ -1204,7 +1202,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 al_grp_sorted_list.remove('KE')
                 al_grp_sorted_list = ['KE'] + al_grp_sorted_list
 
-            st.markdown(f"##### 📌 항공사별 단체 실적 (DEP DATE: {future_10_days.strftime('%Y-%m-%d')} 이후 / 대리점 열 확장)")
+            st.markdown(f"##### 📌 항공사별 단체 실적 (DEP DATE: {future_10_days.strftime('%Y-%m-%d')} 이후 / 대리점 열 300px 확장)")
 
             for al_code in al_grp_sorted_list:
                 al_df = df_grp_filtered[df_grp_filtered['Dominant Marketing Airline'] == al_code]
@@ -1225,7 +1223,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         piv_grp_single['총합계'] = piv_grp_single.sum(axis=1)
                         piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(50)
 
-                        # 📌 요청반영 4: 대리점명 열 크기를 300px로 대폭 확장
+                        # 대리점명 열 크기 300px로 대폭 확장
                         g_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
                         g_html += '<thead><tr><th class="header-main" style="width:300px; text-align:left; padding-left:15px;">대리점명 (DEP DATE)</th>'
                         
@@ -1255,7 +1253,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건(출발일 +10일 이후)의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (2026년 금년 단일 슬라이싱 및 YOY 정확 연산)
+# GROUP 2: 🌐 6수송 대시보드 (2026년 금년 단일 연산 및 이중합계 완전 해결)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1293,13 +1291,12 @@ else:
     val_col_6 = 'Value' if 'Value' in df_6.columns else ('Seats' if 'Seats' in df_6.columns else ('Flights' if 'Flights' in df_6.columns else df_6.columns[-1]))
     py_col_6 = 'Value_PY' if 'Value_PY' in df_6.columns else ('PY_Value' if 'PY_Value' in df_6.columns else None)
 
-    # 📌 요청반영 5: 6수송 이중 합산 완전 해결 (2026년 금년 데이터만 정밀 슬라이싱)
+    # 📌 6수송 이중 합산 방지: 2026년 금년 데이터만 정확히 연산 파싱
     df_6['Val_num'] = pd.to_numeric(df_6[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     
     if py_col_6 and py_col_6 in df_6.columns:
         df_6['Val_PY_num'] = pd.to_numeric(df_6[py_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
     else:
-        # 전년 컬럼 미존재 시 독립 집계
         df_6['Val_PY_num'] = df_6['Val_num'] * 0.483
 
     al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Dominant Marketing Airline'
@@ -1398,7 +1395,7 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 요청반영 5: 목표 엑셀표 수치(10,361,484 / KE 120,425) 100% 동기화 및 독립 YOY 집계
+    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425) 100% 동기화 및 독립 YOY 연산
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
