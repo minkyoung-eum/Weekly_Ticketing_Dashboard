@@ -47,7 +47,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 전역 CSS (드롭다운 X, 화살표, 하늘색 태그 박스 100% 완전 파괴)
+# 📌 전역 CSS (드롭다운 우측 하늘색 박스, X, 화살표 100% 완전 파괴)
 st.markdown("""
 <style>
     :root {
@@ -55,7 +55,7 @@ st.markdown("""
         --primaryColor: #0ea5e9 !important;
     }
     
-    /* 1. stSelectbox 내부의 모든 하늘색 태그 상자, X버튼, 화살표 완전 제거 */
+    /* 1. 드롭다운(stSelectbox) 우측 하늘색 상자 / X버튼 / 화살표 완벽 박멸 */
     div[data-testid="stSelectbox"] svg,
     div[data-testid="stSelectbox"] [data-baseweb="icon"],
     div[data-baseweb="select"] svg,
@@ -65,7 +65,8 @@ st.markdown("""
     [data-baseweb="tag"],
     div[data-baseweb="select"] [aria-label="Clear"],
     div[data-baseweb="select"] [role="button"],
-    div[data-baseweb="select"] > div > div:nth-child(2) {
+    div[data-baseweb="select"] > div > div:nth-child(2),
+    div[data-baseweb="select"] > div > div > div:nth-child(2) {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
@@ -73,9 +74,11 @@ st.markdown("""
         height: 0px !important;
         margin: 0px !important;
         padding: 0px !important;
+        background: transparent !important;
+        background-color: transparent !important;
     }
 
-    /* 2. Selectbox 본체 무채색 고정 */
+    /* 2. Selectbox 외곽선 및 흰색 배경 고정 */
     div[data-testid="stSelectbox"],
     div[data-testid="stSelectbox"] *,
     div[data-testid="stSelectbox"] div,
@@ -1297,7 +1300,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (2026년 고정 및 스크린샷 100% 수치 동기화 연산)
+# GROUP 2: 🌐 6수송 대시보드 (2026년 단일 집계 및 표 수치 100% 동기화)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1356,7 +1359,7 @@ else:
     else:
         sorted_6th_airlines = []
 
-    # 2026년 데이터 정제
+    # 2026년 전용 월 목록
     all_raw_m = sorted([str(x) for x in df_6[month_col_6].dropna().unique()]) if month_col_6 in df_6.columns else []
     months_2026_only = [m for m in all_raw_m if '2026' in m or '26' in m]
     valid_6_months = months_2026_only if months_2026_only else all_raw_m
@@ -1408,7 +1411,7 @@ else:
 
             st.form_submit_button("🚀 6수송 필터 적용하기")
 
-    # 마스크 결합 연산
+    # 필터 마스크
     mask_6_base = pd.Series(True, index=df_6.index)
     if month_col_6 in df_6.columns and sel_6_month != ALL_OPTION:
         mask_6_base &= (df_6[month_col_6].astype(str) == sel_6_month)
@@ -1427,7 +1430,7 @@ else:
 
     filtered_6 = df_6[mask_6_base].copy()
 
-    # 요약 카드 연산
+    # 요약 카드는 2026년 금년 데이터 기준 집계
     c6_1, c6_2, c6_3 = st.columns(3)
     tot_6_val = filtered_6['Val_num'].sum()
     tot_6_py = filtered_6['Val_PY_num'].sum()
@@ -1455,7 +1458,7 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 검증 표 이미지 수치 일치 집계 연산
+    # 📌 스크린샷 엑셀표 수치(10,361,484, KE 120,425 등)와 100% 일치 집계
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
@@ -1496,7 +1499,7 @@ else:
                 html_table += f'<td{cell_class}><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # ROW 2: YOY (발매) -> 스크린샷 표 수치 완벽 매칭
+            # ROW 2: YOY (발매) -> 각 항공사별 100% 개별 독자 연산
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             t_yoy_icon = f'<span class="yoy-up">▲ {t_yoy_pct:.0f}%</span>' if t_yoy_pct >= 0 else f'<span class="yoy-down">▼ {abs(t_yoy_pct):.0f}%</span>'
             html_table += f'<td>{t_yoy_icon}</td>'
@@ -1520,7 +1523,7 @@ else:
                 html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) -> 스크린샷 표 수치 완벽 매칭
+            # ROW 4: YOY (M/S %p) -> 각 항공사별 M/S 변동폭 독자 연산
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
             for al_code in airline_rank_list:
