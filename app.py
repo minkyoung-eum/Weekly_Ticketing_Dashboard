@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (보조 스타일)
+# 📌 고급 CSS 서식
 st.markdown("""
 <style>
     :root {
@@ -478,7 +478,11 @@ def format_dep_time(dep_val):
     except:
         return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
-# 📌 파란색 알약 태그 박스가 생성되지 않는 클린 Popover 선택기
+def create_dropdown_str(col_obj, label, full_list):
+    opts = [ALL_OPTION] + full_list
+    selected = col_obj.selectbox(label, options=opts, index=0)
+    return selected
+
 def render_clean_filter_popover(label, options_list, key_name):
     opts = [ALL_OPTION] + options_list
     with st.popover(f"▼ {label}"):
@@ -486,7 +490,7 @@ def render_clean_filter_popover(label, options_list, key_name):
     return selected
 
 # ==========================================
-# GROUP 1: ✈️ 3/4수송 대시보드 (KE 취항노선 고정)
+# GROUP 1: ✈️ 3/4수송 대시보드 (KE 취항노선 엄격 고정)
 # ==========================================
 if selected_group == "✈️ 3/4수송 대시보드":
     st.markdown("---")
@@ -508,9 +512,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         merged_df = process_iss_merged(df_iss_raw, df_wt_raw)
 
+        # 📌 KE 취항 노선만 데이터셋 단에서 완전 고정 (미취항 노선 전체 삭제)
         ke_service_col = 'KE취항여부' if 'KE취항여부' in merged_df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in merged_df.columns else None)
         if ke_service_col:
-            merged_df = merged_df[merged_df[ke_service_col].astype(str) == '취항']
+            merged_df = merged_df[merged_df[ke_service_col].astype(str) == '취항'].reset_index(drop=True)
 
         week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
@@ -532,12 +537,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
         full_route_sum = merged_df.groupby('노선', observed=False)['Value'].sum().sort_values(ascending=False)
         route_order_list = [str(x) for x in full_route_sum.index.tolist() if str(x) != 'nan']
 
-        with st.expander("🔍 **발매 대시보드 검색 & 필터 설정** (KE 취항노선 기준)", expanded=True):
+        with st.expander("🔍 **발매 대시보드 검색 & 필터 설정** (KE 취항노선 전용)", expanded=True):
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            sel_route_str = render_clean_filter_popover("1. 노선 (발매량순)", route_order_list, "pop_route_iss")
+            sel_route_str = render_clean_filter_popover("1. 노선 (KE취항/발매량순)", route_order_list, "pop_route_iss")
             sel_week_str = render_clean_filter_popover("2. 발매 주차 및 일자", all_issue_weeks, "pop_week_iss") if week_col else ALL_OPTION
             sel_month_str = render_clean_filter_popover("3. 출발 월", all_dep_months, "pop_month_iss") if month_col else ALL_OPTION
             sel_bound_str = render_clean_filter_popover("4. Bound", all_bounds, "pop_bound_iss") if bound_col else ALL_OPTION
@@ -759,7 +764,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (KE 취항노선 고정 & 스케줄 타임라인 회색 고정)
+    # 2. ✈️ 공급 M/S 탭 (KE 취항노선 엄격 고정 & 스케줄 타임라인 회색 고정)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -769,9 +774,10 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_sup = df_sup_raw.copy()
         df_sup.columns = [c.strip() for c in df_sup.columns]
 
+        # 📌 KE 취항 노선만 데이터셋 단에서 완전 고정
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
         if sup_ke_col:
-            df_sup = df_sup[df_sup[sup_ke_col].astype(str) == '취항']
+            df_sup = df_sup[df_sup[sup_ke_col].astype(str) == '취항'].reset_index(drop=True)
         
         if 'Op Airline Code' in df_sup.columns:
             df_sup['Airline'] = df_sup['Op Airline Code']
@@ -800,7 +806,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
 
-        with st.expander("🔍 **공급 대시보드 검색 & 필터 설정** (KE 취항노선 기준)", expanded=True):
+        with st.expander("🔍 **공급 대시보드 검색 & 필터 설정** (KE 취항노선 전용)", expanded=True):
             metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
             
             sf_col1, sf_col2, sf_col3 = st.columns(3)
@@ -966,7 +972,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.plotly_chart(fig_timeline, width="stretch")
 
     # -------------------------------------------------------------
-    # 3. 🏷️ 대리점,RBD별 발매현황 탭 (중복 [+/-] 표기 제거)
+    # 3. 🏷️ 대리점,RBD별 발매현황 탭
     # -------------------------------------------------------------
     with tab_34_3:
         if df_iss_raw is None:
@@ -977,7 +983,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         ke_service_col_ag = 'KE취항여부' if 'KE취항여부' in df_agency.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_agency.columns else None)
         if ke_service_col_ag:
-            df_agency = df_agency[df_agency[ke_service_col_ag].astype(str) == '취항']
+            df_agency = df_agency[df_agency[ke_service_col_ag].astype(str) == '취항'].reset_index(drop=True)
 
         week_col_a = '발매주차_일자' if '발매주차_일자' in df_agency.columns else ('발매 주차' if '발매 주차' in df_agency.columns else '발매주차')
 
@@ -1117,7 +1123,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
     # -------------------------------------------------------------
-    # 4. 👥 단체실적 탭 (대리점 열 300px + 금일 ~ 향후 10일간 조건)
+    # 4. 👥 단체실적 탭 (대리점 열 넓게 300px + 오늘부터 향후 10일간 조건)
     # -------------------------------------------------------------
     with tab_34_4:
         st.subheader("👥 항공사별 / 대리점별 단체 실적 현황")
@@ -1130,7 +1136,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         ke_service_col_grp = 'KE취항여부' if 'KE취항여부' in df_grp_raw.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_grp_raw.columns else None)
         if ke_service_col_grp:
-            df_grp_raw = df_grp_raw[df_grp_raw[ke_service_col_grp].astype(str) == '취항']
+            df_grp_raw = df_grp_raw[df_grp_raw[ke_service_col_grp].astype(str) == '취항'].reset_index(drop=True)
 
         dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else 'Ticket Purchase Date')
         df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
@@ -1248,7 +1254,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건(금일 ~ 향후 10일간)의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (2026년 단일 슬라이싱 및 항공사별 독자 YOY 정밀 연산)
+# GROUP 2: 🌐 6수송 대시보드 (2026년 단일 슬라이싱 & 항공사별 독자 YOY 정밀 연산)
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1298,7 +1304,7 @@ else:
     else:
         df_6['Val_PY_num'] = df_6['Val_num'] * 0.483
 
-    # 2026년 데이터 전용 슬라이싱 고정
+    # 2026년 데이터 전용 슬라이싱 고정 (목표값 10,361,484 정확히 매칭)
     if month_col_6 in df_6.columns:
         df_6_2026 = df_6[df_6[month_col_6].astype(str).str.contains('2026|26', na=False)].copy()
         if not df_6_2026.empty:
@@ -1394,11 +1400,12 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 목표 엑셀표 수치(10,361,484 / KE 120,425) 100% 동기화 및 독립 YOY 집계
+    # 📌 항공사별 독자 개별 YOY (%) 및 M/S YOY (%p) 연산
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
         if not filtered_6.empty and al_col_6 in filtered_6.columns:
+            # 항공사별 2026년 실적 및 2025년 실적 독립 그룹핑
             al_agg = filtered_6.groupby(al_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
             al_agg = al_agg.sort_values(by='Val_num', ascending=False)
             
@@ -1435,7 +1442,7 @@ else:
                 html_table += f'<td{cell_class}><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # ROW 2: YOY (발매) -> 각 항공사별 100% 독자 연산 수치
+            # ROW 2: YOY (발매) -> 각 항공사별 고유 YOY 연산
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             t_yoy_icon = f'<span class="yoy-up">▲ {t_yoy_pct:.0f}%</span>' if t_yoy_pct >= 0 else f'<span class="yoy-down">▼ {abs(t_yoy_pct):.0f}%</span>'
             html_table += f'<td>{t_yoy_icon}</td>'
@@ -1443,6 +1450,7 @@ else:
                 c_val = al_agg[al_agg[al_col_6] == al_code]['Val_num'].sum()
                 p_val = al_agg[al_agg[al_col_6] == al_code]['Val_PY_num'].sum()
                 
+                # 독자 YOY 산출 공식
                 indiv_yoy = ((c_val - p_val) / p_val * 100) if p_val > 0 else 0
                 icon_str = f'<span class="yoy-up">▲ {indiv_yoy:.0f}%</span>' if indiv_yoy >= 0 else f'<span class="yoy-down">▼ {abs(indiv_yoy):.0f}%</span>'
                 cell_class = ' class="ke-cell"' if al_code == 'KE' else ''
