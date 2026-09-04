@@ -47,45 +47,51 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 100% 드롭다운(stSelectbox) 파란색 박스 제로화 CSS
+# 📌 드롭다운 내부 'X' (Clear 아이콘) 및 하늘색 박스 100% 완전 파기 CSS
 st.markdown("""
 <style>
-    /* 1. Streamlit stSelectbox 컴포넌트 내부 및 우측 패널 파란색 완벽 박멸 */
-    div[data-testid="stSelectbox"],
-    div[data-testid="stSelectbox"] *,
-    div[data-testid="stSelectbox"] div,
-    div[data-testid="stSelectbox"] span,
-    div[data-testid="stSelectbox"] button,
-    div[data-testid="stSelectbox"] [role="button"],
-    div[data-testid="stSelectbox"] [data-baseweb="select"],
-    div[data-testid="stSelectbox"] [aria-expanded],
-    div[data-baseweb="select"],
-    div[data-baseweb="select"] * {
-        background-color: #ffffff !important;
-        background: #ffffff !important;
-        box-shadow: none !important;
+    /* 1. Streamlit 전역 primaryColor 오버라이드 */
+    :root {
+        --primary-color: #0ea5e9 !important;
+        --primaryColor: #0ea5e9 !important;
     }
     
-    /* 2. 드롭다운 외곽 테두리 및 화살표 아이콘 무채색 지정 */
-    div[data-testid="stSelectbox"] > div {
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 6px !important;
-    }
-    
-    div[data-testid="stSelectbox"] svg {
-        fill: #64748b !important;
-        color: #64748b !important;
-    }
-
-    /* 3. 불필요한 태그 박스 완전 숨김 */
-    span[data-baseweb="tag"],
+    /* 2. 📌 핵심: 드롭다운 내 'X' 이미지/버튼/아이콘 및 하늘색 태그 완벽 은폐 */
+    div[data-baseweb="select"] span[data-baseweb="tag"],
+    div[data-baseweb="select"] div[data-baseweb="tag"],
+    div[data-baseweb="select"] button,
+    div[data-baseweb="select"] svg,
+    div[data-baseweb="select"] [aria-label="Clear"],
     div[data-baseweb="tag"],
+    span[data-baseweb="tag"],
     [data-baseweb="tag"] {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
         width: 0px !important;
         height: 0px !important;
+        margin: 0px !important;
+        padding: 0px !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* 3. Selectbox 외곽 틀 깔끔 무채색 보정 */
+    div[data-testid="stSelectbox"] > div,
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 6px !important;
+    }
+    
+    div[data-baseweb="select"] input {
+        background-color: transparent !important;
+    }
+    
+    div[data-baseweb="select"]:focus-within > div {
+        border-color: #0ea5e9 !important;
     }
 
     /* Radio / Toggle */
@@ -977,6 +983,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         fig_timeline.update_yaxes(autorange="reversed", title="항공사")
                         fig_timeline.update_xaxes(title="하루 시간대 (00:00 ~ 24:00)", dtick=3600000, tickformat="%H:%M")
                         
+                        # 📌 KE 막대에 두꺼운 테두리 및 강한 색상 강조
                         for trace in fig_timeline.data:
                             if trace.name == 'KE':
                                 trace.marker.line.color = '#0284c7'
