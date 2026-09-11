@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (중앙 정렬 및 KE 깔끔 강조)
+# 📌 고급 CSS 서식 (버전 문제 없는 무결점 스크롤 박스 서식)
 st.markdown("""
 <style>
     :root {
@@ -198,7 +198,6 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* 📌 [요구사항 반영] KE 열 깔끔한 세련된 색상 강조 (전체 중앙정렬) */
     .yoy-table th.ke-header {
         background-color: #0284c7 !important;
         color: #ffffff !important;
@@ -457,11 +456,11 @@ def format_dep_time(dep_val):
     except:
         return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
+# 📌 [수정 - 호환성 완벽 고침] 버전 문제없이 동작하는 스크롤 박스 렌더링 함수
 def render_slicer_box(container, label, full_list, key_name):
-    opts = [ALL_OPTION] + full_list
+    opts = [ALL_OPTION] + (full_list if full_list else [])
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
-    with container.container(height=130):
-        selected = st.radio(label, options=opts, index=0, key=key_name, label_visibility="collapsed")
+    selected = container.selectbox(label, options=opts, index=0, key=key_name, label_visibility="collapsed")
     return selected
 
 # ==========================================
@@ -1224,7 +1223,6 @@ else:
 
     df_6_raw = df_6th_raw.copy()
     
-    # 📌 [수정] 6수송 컬럼 자동 매핑 보완 (notranslate 번역오류 차단 속성 가공)
     col_map_6th = {
         'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 ', 'Trip Month', 'TRIP_MONTH', 'MONTH'],
         '4.OD RGN': ['4.OD RGN', 'OD REGION', 'Region', 'OD 권역', '4. OD RGN', 'OD RGN', 'OD_REGION'],
@@ -1299,7 +1297,6 @@ else:
         df_6['Val_num'] = df_6['Val_raw']
         df_6['Val_PY_num'] = df_6['Val_raw'] * 0.483
 
-    # 📌 [수정] 6수송 항공사 순서: KE 최우선 -> 발매량 순서 정렬
     if al_col_6 in df_6.columns:
         al_order_6th = df_6.groupby(al_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
         if 'KE' in al_order_6th:
@@ -1332,7 +1329,6 @@ else:
 
         act_onoff_c = actual_cols['ON/OFF 여부']
         all_onoff_6 = sorted([str(x) for x in df_6[act_onoff_c].dropna().unique()]) if act_onoff_c and act_onoff_c in df_6.columns else []
-        # 번역 오류 방지용 명칭
         sel_6_onoff = render_slicer_box(r_col5, "5. 연계구분 (온/오프)", all_onoff_6, "slicer_onoff_6")
 
         st.markdown("---")
@@ -1508,12 +1504,11 @@ else:
             apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
-    # 📌 [수정 완벽 반영] Carrier별 M/S 탭 (KE 1위 -> 발매량 순 가로배치 + Default KE + 25년 필드 삭제 + 가운데 정렬)
+    # 📌 Carrier별 M/S 탭 (안전장치 적용)
     with tab6_2:
         st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
         if not filtered_6.empty and od_col_6 and od_col_6 in filtered_6.columns and al_col_6 and al_col_6 in filtered_6.columns:
             
-            # 📌 항공사 정렬: KE 최우선 -> 발매량 많은 순서대로 1위, 2위...
             carrier_sales_sum = filtered_6.groupby(al_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False)
             carrier_rank_ordered = [str(x) for x in carrier_sales_sum.index if pd.notnull(x)]
             
@@ -1523,12 +1518,14 @@ else:
             else:
                 final_carrier_opts = ['KE'] + carrier_rank_ordered
 
+            if not final_carrier_opts:
+                final_carrier_opts = ['KE']
+
             st.write("**비교 분석할 항공사 선택 (KE 최우선 & 발매량 1위 순 정렬):**")
-            # 📌 가로 배치(horizontal=True) 및 default값 'KE' 고정
             selected_carrier = st.radio(
                 "비교분석할 항공사 지정:",
                 options=final_carrier_opts,
-                index=0,  # KE Default 선택
+                index=0,
                 key="radio_carrier_horiz",
                 horizontal=True,
                 label_visibility="collapsed"
@@ -1546,7 +1543,6 @@ else:
                 carrier_html += '<th class="mkt-header" style="width:50px; text-align:center;" rowspan="2">순위</th>'
                 carrier_html += '<th class="mkt-header" style="width:140px; text-align:center;" rowspan="2">TOP O&D</th>'
                 
-                # 📌 [수정] 25년 필드 삭제: 26년 및 YOY만 표출
                 carrier_html += '<th class="mkt-header" colspan="2" style="text-align:center;">시장 전체</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 발매량 ({selected_carrier})</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 M/S ({selected_carrier})</th>'
@@ -1591,7 +1587,6 @@ else:
                     k_ms_diff = k_ms_cy - k_ms_py
                     k_ms_diff_str = f'<span class="yoy-up">▲ {k_ms_diff:.1f}%p</span>' if k_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(k_ms_diff):.1f}%p</span>'
 
-                    # 📌 [수정] 25년 컬럼 제거 및 전체 중앙 정렬
                     carrier_html += f'<tr>'
                     carrier_html += f'<td style="text-align:center;">{idx}</td>'
                     carrier_html += f'<td style="font-weight:600; text-align:center;">{od_name}</td>'
