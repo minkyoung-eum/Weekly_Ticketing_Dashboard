@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import numpy as np
 import datetime
 import os
@@ -50,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 [수정 반영] 고급 CSS 서식 (표 테두리 연한 회색, 상/하단 굵은 테두리, KE 초록 강조)
+# 📌 테두리 회색 통일 & 둥근 스타일 CSS 서식
 st.markdown("""
 <style>
     :root {
@@ -91,8 +90,8 @@ st.markdown("""
     }
     .metric-card {
         background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
         padding: 14px;
         text-align: center;
         box-shadow: 0 2px 4px rgba(0,0,0,0.03);
@@ -100,11 +99,11 @@ st.markdown("""
     }
     .metric-card-ke {
         background-color: #f0fdf4;
-        border: 2px solid #16a34a;
-        border-radius: 10px;
+        border: 1px solid #16a34a;
+        border-radius: 8px;
         padding: 14px;
         text-align: center;
-        box-shadow: 0 3px 6px rgba(22,163,74,0.15);
+        box-shadow: 0 3px 6px rgba(22,163,74,0.12);
         margin-bottom: 10px;
     }
     .metric-title {
@@ -126,74 +125,28 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 📌 모든 3/4수송 피벗 테이블 테두리 디자인 (연한 회색 + 맨위/맨아래 굵게) */
-    .custom-piv-container {
+    /* 📌 모든 피벗 및 M/S 표 테두리 일괄 통일 (회색, 1px, 둥근 모서리) */
+    .custom-piv-container, .yoy-table-container {
         width: 100%;
         overflow-x: auto;
         margin-bottom: 20px;
-        border-radius: 6px;
+        border-radius: 8px;
         border: 1px solid #cbd5e1;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
-    .custom-piv-table {
+    .custom-piv-table, .yoy-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 12.5px;
         background-color: #ffffff;
-        border-top: 2.5px solid #1e293b !important;
-        border-bottom: 2.5px solid #1e293b !important;
-    }
-    .custom-piv-table th.header-main {
-        background-color: #3b6998 !important;
-        color: #ffffff !important;
-        font-weight: 700;
-        padding: 8px 10px;
-        border: 1px solid #cbd5e1;
-        text-align: center;
-        letter-spacing: -0.2px;
-    }
-    .custom-piv-table tr.row-group-header {
-        background-color: #dbeafe !important;
-        font-weight: 800;
-        color: #0f172a;
-    }
-    .custom-piv-table tr.row-group-header td {
-        padding: 7px 12px;
-        border: 1px solid #cbd5e1;
-        text-align: center;
-    }
-    .custom-piv-table td {
-        padding: 6px 10px;
-        border: 1px solid #cbd5e1 !important;
-        color: #334155;
         text-align: center !important;
     }
-
-    /* 📌 모든 6수송 피벗 테이블 테두리 디자인 (연한 회색 + 맨위/맨아래 굵게) */
-    .yoy-table-container {
-        width: 100%;
-        max-height: 650px;
-        overflow-x: auto;
-        overflow-y: auto;
-        margin-bottom: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .yoy-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 12px;
-        text-align: center !important;
-        background-color: #ffffff;
-        letter-spacing: -0.3px;
-        border-top: 2.5px solid #1e293b !important;
-        border-bottom: 2.5px solid #1e293b !important;
-    }
-    .yoy-table th {
+    .custom-piv-table th.header-main, .yoy-table th {
         padding: 8px 6px;
         border: 1px solid #cbd5e1 !important;
         font-weight: 700;
-        white-space: nowrap;
         text-align: center !important;
+        white-space: nowrap;
     }
     .yoy-table th.mkt-header {
         background-color: #2b579a !important;
@@ -208,19 +161,17 @@ st.markdown("""
         color: #ffffff !important;
         font-size: 13px !important;
         font-weight: 800 !important;
+    }
+    .custom-piv-table td, .yoy-table td {
+        padding: 6px 10px;
         border: 1px solid #cbd5e1 !important;
+        color: #334155;
+        text-align: center !important;
     }
     .yoy-table td.ke-cell, .yoy-table tr.ke-row {
         background-color: #f0fdf4 !important;
         font-weight: 800 !important;
         color: #15803d !important;
-        border: 1px solid #cbd5e1 !important;
-        text-align: center !important;
-    }
-    .yoy-table td {
-        text-align: center !important;
-        padding: 6px 8px;
-        border: 1px solid #cbd5e1 !important;
     }
     .yoy-table tr:hover {
         background-color: #f8fafc !important;
@@ -235,23 +186,13 @@ st.markdown("""
         font-weight: bold;
         color: #0f172a;
     }
-    /* 📌 [수정 반영] 맨 밑 M/S YOY 하단 테두리를 초록색에서 진한 회색으로 변경 */
-    .yoy-table tr.row-ms-yoy td {
-        border-bottom: 2.5px solid #475569 !important;
-    }
     
-    .yoy-up {
-        color: #16a34a;
-        font-weight: 700;
-    }
-    .yoy-down {
-        color: #dc2626;
-        font-weight: 700;
-    }
+    .yoy-up { color: #16a34a; font-weight: 700; }
+    .yoy-down { color: #dc2626; font-weight: 700; }
 
     .ke-timeline-box {
         background-color: #f0f9ff;
-        border: 2px solid #0ea5e9;
+        border: 1px solid #0ea5e9;
         border-radius: 8px;
         padding: 12px 18px;
         margin-bottom: 15px;
@@ -270,6 +211,7 @@ uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['
 uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
+# 메모리 절감을 위한 캐싱 및 최적화
 def optimize_df(df_in):
     if df_in is None:
         return None
@@ -284,7 +226,7 @@ def optimize_df(df_in):
             df_in[col] = df_in[col].astype('float32')
     return df_in
 
-@st.cache_data(max_entries=4, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
         return None
@@ -312,28 +254,22 @@ def load_smart_file(uploaded_file):
         return optimize_df(pd.read_excel(uploaded_file))
     return None
 
-@st.cache_data(max_entries=4, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
     if os.path.exists('34수송_9월2주차.csv'):
         df_iss = pd.read_csv('34수송_9월2주차.csv', low_memory=False)
     elif os.path.exists('34수송_9월1주차_CSV_2.csv'):
         df_iss = pd.read_csv('34수송_9월1주차_CSV_2.csv', low_memory=False)
-    elif os.path.exists('Ticketing-test_2.csv'):
-        df_iss = pd.read_csv('Ticketing-test_2.csv', low_memory=False)
         
     if os.path.exists('가중치 파일.csv'):
         df_wt = pd.read_csv('가중치 파일.csv', low_memory=False)
         
     if os.path.exists('공급_9월1주차_CSV.csv'):
         df_sup = pd.read_csv('공급_9월1주차_CSV.csv', low_memory=False)
-    elif os.path.exists('공급.xlsx'):
-        df_sup = pd.read_excel('공급.xlsx', sheet_name='공급_RAW')
         
     if os.path.exists('6TRF TEST.csv'):
         df_6th = pd.read_csv('6TRF TEST.csv', low_memory=False)
-    elif os.path.exists('6th_freedom.csv'):
-        df_6th = pd.read_csv('6th_freedom.csv', low_memory=False)
         
     return optimize_df(df_iss), optimize_df(df_wt), optimize_df(df_sup), optimize_df(df_6th)
 
@@ -344,7 +280,7 @@ df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else disk_6th
 
-@st.cache_data(max_entries=4, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def process_iss_merged(df_iss, df_wt):
     if df_iss is None or df_wt is None:
         return None
@@ -416,7 +352,7 @@ def process_iss_merged(df_iss, df_wt):
 
     return optimize_df(merged_df)
 
-# Header Notice
+# 메인 타이틀
 st.title("✈️ 일본노선 발매/공급 Market Share")
 st.markdown(f"""
 <div class="source-header-box">
@@ -729,7 +665,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭
+    # 2. ✈️ 공급 M/S 탭 (📌 [수정 반영] 텍스트 간소화)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -772,14 +708,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         sup_color_map = build_airline_color_map(sup_airlines)
 
+        # 📌 [수정 반영] 슬라이서 필터 텍스트 단정하게 간소화
         with st.expander("🔍 **공급 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
             
             sf_col1, sf_col2, sf_col3, sf_col4 = st.columns(4)
-            selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선 (공급석 순 정렬)", sup_routes, "slicer_route_sup")
+            selected_sup_route_str = render_slicer_box(sf_col1, "1. 노선", sup_routes, "slicer_route_sup")
             selected_sup_month_str = render_slicer_box(sf_col2, "2. 출발 월", sup_months, "slicer_month_sup") if sup_month_col else ALL_OPTION
             selected_sup_time_str = render_slicer_box(sf_col3, "3. 출발 시간대", sup_time_cats, "slicer_time_sup")
-            selected_sup_al_str = render_slicer_box(sf_col4, "4. 항공사 (KE 최우선)", sup_airlines, "slicer_al_sup")
+            selected_sup_al_str = render_slicer_box(sf_col4, "4. 항공사", sup_airlines, "slicer_al_sup")
 
         target_val = 'Seats_num' if "공급석" in metric_mode else 'Flights_num'
 
@@ -1071,10 +1008,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
     # -------------------------------------------------------------
-    # 4. 👥 단체실적 탭 (📌 [수정 반영] 승객분류 Grp 고정, 소노선/항공사 2개 필터만 설정)
+    # 4. 👥 단체실적 탭 (📌 [수정 반영] 타이틀 및 3개 필터 구조 변경)
     # -------------------------------------------------------------
     with tab_34_4:
-        st.subheader("👥 항공사별 / 대리점별 단체 실적 현황 (출발일 기준 향후 10일)")
+        # 📌 제목 변경: 발매 - 항공사별/대리점별 단체 발매 현황
+        st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         
         if df_iss_raw is None:
             st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV_2.csv] 파일이 업로드되어 있는지 확인해주세요.")
@@ -1091,22 +1029,27 @@ if selected_group == "✈️ 3/4수송 대시보드":
             target_future_dt = pd.to_datetime(future_10_days)
             df_grp_raw = df_grp_raw[(df_grp_raw['Date_Obj'] >= target_today_dt) & (df_grp_raw['Date_Obj'] <= target_future_dt)]
 
-        # 📌 [수정 반영] 승객 분류 Grp 내부 고정 및 소노선/항공사 2개 필터 박스만 표출
+        # 📌 [수정 반영] 필터 구성: 1. 노선, 2. 출발월, 3. 항공사
         with st.expander("🔍 **단체실적 검색 피벗 슬라이서 필터 설정**", expanded=True):
-            gf_col1, gf_col2 = st.columns(2)
+            gf_col1, gf_col2, gf_col3 = st.columns(3)
             
             all_g_routes = sorted([str(x) for x in df_grp_raw['노선'].dropna().unique()])
-            sel_g_route_str = render_slicer_box(gf_col1, "1. 소노선 (노선)", all_g_routes, "slicer_route_grp")
+            sel_g_route_str = render_slicer_box(gf_col1, "1. 노선", all_g_routes, "slicer_route_grp")
+
+            g_month_col = '출발월' if '출발월' in df_grp_raw.columns else ('출발 월' if '출발 월' in df_grp_raw.columns else None)
+            all_g_months = sorted([str(x) for x in df_grp_raw[g_month_col].dropna().unique()]) if g_month_col else []
+            sel_g_month_str = render_slicer_box(gf_col2, "2. 출발월", all_g_months, "slicer_month_grp") if g_month_col else ALL_OPTION
 
             raw_g_al = sorted([str(x) for x in df_grp_raw['Dominant Marketing Airline'].dropna().unique()])
             all_g_al = ['KE'] + [x for x in raw_g_al if x != 'KE'] if 'KE' in raw_g_al else raw_g_al
-            sel_g_al_str = render_slicer_box(gf_col2, "2. 항공사", all_g_al, "slicer_al_grp")
+            sel_g_al_str = render_slicer_box(gf_col3, "3. 항공사", all_g_al, "slicer_al_grp")
 
         mask_grp = pd.Series(True, index=df_grp_raw.index)
         if sel_g_route_str != ALL_OPTION: mask_grp &= (df_grp_raw['노선'].astype(str) == sel_g_route_str)
+        if g_month_col and sel_g_month_str != ALL_OPTION: mask_grp &= (df_grp_raw[g_month_col].astype(str) == sel_g_month_str)
         if sel_g_al_str != ALL_OPTION: mask_grp &= (df_grp_raw['Dominant Marketing Airline'].astype(str) == sel_g_al_str)
 
-        # GRP (단체) 조건 강제 적용
+        # GRP (단체) 승객분류 내부 고정
         is_grp_cond = (
             ((df_grp_raw['Dominant Marketing Airline'] == '7C') & (df_grp_raw['O&D RBKD'] == 'V')) |
             ((df_grp_raw['Dominant Marketing Airline'] != '7C') & (df_grp_raw['O&D RBKD'] == 'G'))
@@ -1382,7 +1325,7 @@ else:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 📌 [수정 반영] 6수송 대시보드 탭 개편 (월별 차트 삭제 및 Carrier별 M/S를 1번 탭 하단으로 통합)
+    # 📌 [수정 반영] Carrier별 M/S 섹션을 O&D 종합 탭 하단으로 통합 배치
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
@@ -1468,28 +1411,12 @@ else:
 
         st.markdown("---")
         
-        # 📌 [수정 반영] Carrier별 M/S (상위 TOP 30 O&D 상세 비교) 섹션을 1번 탭 하단으로 통합 이동
-        st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
-        if not filtered_6.empty and od_col_6 and od_col_6 in filtered_6.columns and al_col_6 and al_col_6 in filtered_6.columns:
-            
-            carrier_sales_sum = filtered_6.groupby(al_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False)
-            carrier_rank_ordered = [str(x) for x in carrier_sales_sum.index if pd.notnull(x)]
-            
-            if 'KE' in carrier_rank_ordered:
-                carrier_rank_ordered.remove('KE')
-            
-            # 📌 [수정 반영] 상위 20개 옵션 제한 및 순서 재배치: '전체 (All)' -> 'KE' -> 발매량 순 18개
-            final_carrier_opts = [ALL_OPTION, 'KE'] + carrier_rank_ordered[:18]
+        # 📌 [수정 반영] 중복 라디오 버튼 제거 / 상단 슬라이서 '9. 항공사' 선택값 연동
+        selected_carrier = sel_6_al
+        display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
-            st.write("**항공사 선택:**")
-            selected_carrier = st.radio(
-                "항공사 선택:",
-                options=final_carrier_opts,
-                index=0,
-                key="radio_carrier_horiz_integrated",
-                horizontal=True,
-                label_visibility="collapsed"
-            )
+        st.subheader(f"■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교 - 선택 항공사: {display_carrier_label})")
+        if not filtered_6.empty and od_col_6 and od_col_6 in filtered_6.columns and al_col_6 and al_col_6 in filtered_6.columns:
 
             # TOP O&D Market 노선 구간명 기반 그룹핑
             od_totals = filtered_6.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
@@ -1505,8 +1432,8 @@ else:
                 carrier_html += '<th class="mkt-header" style="width:140px; text-align:center;" rowspan="2">TOP O&D Market</th>'
                 
                 carrier_html += '<th class="mkt-header" colspan="2" style="text-align:center;">시장 전체</th>'
-                carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 발매량 ({selected_carrier})</th>'
-                carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 M/S ({selected_carrier})</th>'
+                carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 발매량 ({display_carrier_label})</th>'
+                carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 M/S ({display_carrier_label})</th>'
                 carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">★ KE 발매량</th>'
                 carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">★ KE M/S</th>'
                 carrier_html += '</tr><tr>'
