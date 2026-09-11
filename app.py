@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (버전 문제 없는 무결점 스크롤 박스 서식)
+# 📌 고급 CSS 서식 (KE 테두리 외곽선만 세련되게 강조)
 st.markdown("""
 <style>
     :root {
@@ -156,13 +156,11 @@ st.markdown("""
         padding: 7px 12px;
         border-top: 1.5px solid #93c5fd;
         border-bottom: 1.5px solid #93c5fd;
-        text-align: center;
     }
     .custom-piv-table td {
         padding: 5px 10px;
         border: 1px solid #e2e8f0;
         color: #334155;
-        text-align: center !important;
     }
 
     .yoy-table-container {
@@ -178,7 +176,7 @@ st.markdown("""
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
-        text-align: center !important;
+        text-align: center;
         background-color: #ffffff;
         letter-spacing: -0.3px;
     }
@@ -187,7 +185,6 @@ st.markdown("""
         border: 1px solid #cbd5e1;
         font-weight: 700;
         white-space: nowrap;
-        text-align: center !important;
     }
     .yoy-table th.mkt-header {
         background-color: #2b579a !important;
@@ -198,6 +195,7 @@ st.markdown("""
         color: #ffffff !important;
     }
     
+    /* 📌 [요구사항 반영] O&D 테이블 KE 강조: 과한 배경색 대신 깔끔한 외곽선 테두리 강조 */
     .yoy-table th.ke-header {
         background-color: #0284c7 !important;
         color: #ffffff !important;
@@ -205,6 +203,7 @@ st.markdown("""
         font-weight: 800 !important;
         border-left: 2px solid #0369a1 !important;
         border-right: 2px solid #0369a1 !important;
+        border-top: 2px solid #0369a1 !important;
     }
     .yoy-table td.ke-cell, .yoy-table tr.ke-row {
         background-color: #f0f9ff !important;
@@ -212,10 +211,6 @@ st.markdown("""
         color: #0284c7 !important;
         border-left: 2px solid #0284c7 !important;
         border-right: 2px solid #0284c7 !important;
-        text-align: center !important;
-    }
-    .yoy-table td {
-        text-align: center !important;
     }
     .yoy-table tr:hover {
         background-color: #f8fafc !important;
@@ -274,7 +269,7 @@ def optimize_df(df_in):
             df_in[col] = df_in[col].astype('float32')
     return df_in
 
-@st.cache_data(max_entries=4, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
         return None
@@ -294,7 +289,7 @@ def load_smart_file(uploaded_file):
         return optimize_df(pd.read_excel(uploaded_file))
     return None
 
-@st.cache_data(max_entries=4, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
     if os.path.exists('34수송_9월2주차.csv'):
@@ -326,7 +321,7 @@ df_wt_raw = load_smart_file(uploaded_wt) if uploaded_wt else disk_wt
 df_sup_raw = load_smart_file(uploaded_sup) if uploaded_sup else disk_sup
 df_6th_raw = load_smart_file(uploaded_6th) if uploaded_6th else (disk_6th if disk_6th is not None else df_iss_raw)
 
-@st.cache_data(max_entries=4, ttl=3600)
+@st.cache_data(max_entries=2, ttl=3600)
 def process_iss_merged(df_iss, df_wt):
     if df_iss is None or df_wt is None:
         return None
@@ -456,11 +451,11 @@ def format_dep_time(dep_val):
     except:
         return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
-# 📌 [수정 - 호환성 완벽 고침] 버전 문제없이 동작하는 스크롤 박스 렌더링 함수
 def render_slicer_box(container, label, full_list, key_name):
-    opts = [ALL_OPTION] + (full_list if full_list else [])
+    opts = [ALL_OPTION] + full_list
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
-    selected = container.selectbox(label, options=opts, index=0, key=key_name, label_visibility="collapsed")
+    with container.container(height=130):
+        selected = st.radio(label, options=opts, index=0, key=key_name, label_visibility="collapsed")
     return selected
 
 # ==========================================
@@ -797,6 +792,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_sup = df_sup[filter_mask_sup]
 
+        # 📌 [요구사항 반영] 공급 Raw 데이터 다운로드 버튼
         csv_sup = filtered_sup.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 필터링된 공급 Raw Data (CSV) 전체 다운로드",
@@ -967,6 +963,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_ag_filtered = df_agency[mask_ag]
 
+        # 📌 [요구사항 반영] 대리점/RBD Raw 데이터 다운로드 버튼
         csv_ag = df_ag_filtered.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 필터링된 대리점/RBD Raw Data (CSV) 전체 다운로드",
@@ -1009,19 +1006,19 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                 piv_rbd = piv_rbd.sort_values(by='총합계', ascending=False)
 
                             rbd_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
-                            rbd_html += '<thead><tr><th class="header-main" style="width:140px; text-align:center;">RBD 클래스</th>'
+                            rbd_html += '<thead><tr><th class="header-main" style="width:140px; text-align:left; padding-left:15px;">RBD 클래스</th>'
                             for wk in week_list:
                                 rbd_html += f'<th class="header-main">{wk}</th>'
                             rbd_html += '<th class="header-main" style="background-color:#2b579a !important;">총합계</th></tr></thead><tbody>'
 
                             for rbd_code, rbd_row in piv_rbd.head(100).iterrows():
-                                rbd_html += f'<tr><td style="text-align:center; font-weight:700;">{rbd_code}</td>'
+                                rbd_html += f'<tr><td style="text-align:left; padding-left:15px; font-weight:700;">{rbd_code}</td>'
                                 for wk in week_list:
                                     v_num = rbd_row[wk] if wk in rbd_row else 0
                                     v_str = f"{v_num:,.0f}" if v_num > 0 else ""
-                                    rbd_html += f'<td style="text-align:center;">{v_str}</td>'
+                                    rbd_html += f'<td style="text-align:right; padding-right:15px;">{v_str}</td>'
                                 tot_v = rbd_row['총합계']
-                                rbd_html += f'<td style="text-align:center; font-weight:700; background-color:#f1f5f9;">{tot_v:,.0f}</td></tr>'
+                                rbd_html += f'<td style="text-align:right; padding-right:15px; font-weight:700; background-color:#f1f5f9;">{tot_v:,.0f}</td></tr>'
 
                             rbd_html += '</tbody></table></div>'
                             st.markdown(rbd_html, unsafe_allow_html=True)
@@ -1053,7 +1050,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             piv_ag_sub = piv_ag_sub.set_index('Dominant Marketing Airline')
 
                             ag_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
-                            ag_html += '<thead><tr><th class="header-main" style="width:160px; text-align:center;">항공사</th>'
+                            ag_html += '<thead><tr><th class="header-main" style="width:160px; text-align:left; padding-left:15px;">항공사</th>'
                             for wk in week_list_ag:
                                 ag_html += f'<th class="header-main">{wk}</th>'
                             ag_html += '<th class="header-main" style="background-color:#2b579a !important;">총 판매량</th></tr></thead><tbody>'
@@ -1062,13 +1059,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                 is_ke_flag = (al_code == 'KE')
                                 cell_style = 'font-weight:700; color:#0284c7;' if is_ke_flag else 'color:#475569;'
                                 
-                                ag_html += f'<tr><td style="text-align:center; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
+                                ag_html += f'<tr><td style="text-align:left; padding-left:15px; {cell_style}">{"★ KE" if is_ke_flag else al_code}</td>'
                                 for wk in week_list_ag:
                                     v_num = al_row[wk] if wk in al_row else 0
                                     v_str = f"{v_num:,.0f}" if v_num > 0 else ""
-                                    ag_html += f'<td style="text-align:center; {cell_style}">{v_str}</td>'
+                                    ag_html += f'<td style="text-align:right; padding-right:15px; {cell_style}">{v_str}</td>'
                                 tot_v = al_row['총합계']
-                                ag_html += f'<td style="text-align:center; font-weight:700; background-color:#f1f5f9; {cell_style}">{tot_v:,.0f}</td></tr>'
+                                ag_html += f'<td style="text-align:right; padding-right:15px; font-weight:700; background-color:#f1f5f9; {cell_style}">{tot_v:,.0f}</td></tr>'
 
                             ag_html += '</tbody></table></div>'
                             st.markdown(ag_html, unsafe_allow_html=True)
@@ -1145,6 +1142,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_grp_filtered = df_grp_raw[mask_grp].copy()
 
+        # 📌 [요구사항 반영] 단체실적 Raw 데이터 다운로드 버튼
         csv_grp = df_grp_filtered.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 필터링된 단체실적 Raw Data (CSV) 전체 다운로드",
@@ -1185,27 +1183,27 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(100)
 
                         g_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
-                        g_html += '<thead><tr><th class="header-main" style="width:300px; text-align:center;">대리점명 (DATE)</th>'
+                        g_html += '<thead><tr><th class="header-main" style="width:300px; text-align:left; padding-left:15px;">대리점명 (DATE)</th>'
                         
                         for d_col in date_col_list:
                             g_html += f'<th class="header-main">{d_col}</th>'
                         g_html += '<th class="header-main" style="background-color:#2b579a !important;">총합계</th></tr></thead><tbody>'
 
                         g_html += '<tr class="row-group-header">'
-                        g_html += f'<td style="text-align:center;">★ {al_code} 전체 총합계</td>'
+                        g_html += f'<td style="text-align:left; padding-left:15px;">★ {al_code} 전체 총합계</td>'
                         for d_col in date_col_list:
                             day_sum = piv_grp_single[d_col].sum() if d_col in piv_grp_single.columns else 0
-                            g_html += f'<td style="text-align:center;"><b>{day_sum:,.0f}</b></td>'
-                        g_html += f'<td style="text-align:center; background-color:#bfdbfe;"><b>{al_total_val:,.0f}</b></td></tr>'
+                            g_html += f'<td style="text-align:right; padding-right:12px;"><b>{day_sum:,.0f}</b></td>'
+                        g_html += f'<td style="text-align:right; padding-right:12px; background-color:#bfdbfe;"><b>{al_total_val:,.0f}</b></td></tr>'
 
                         for ag_name, ag_row in piv_grp_single.iterrows():
-                            g_html += f'<tr><td style="text-align:center; font-weight:600;">{ag_name}</td>'
+                            g_html += f'<tr><td style="text-align:left; padding-left:15px; font-weight:600;">{ag_name}</td>'
                             for d_col in date_col_list:
                                 v_num = ag_row[d_col] if d_col in ag_row else 0
                                 v_str = f"{v_num:,.0f}" if v_num > 0 else ""
-                                g_html += f'<td style="text-align:center;">{v_str}</td>'
+                                g_html += f'<td style="text-align:right; padding-right:12px;">{v_str}</td>'
                             tot_row_val = ag_row['총합계']
-                            g_html += f'<td style="text-align:center; font-weight:700; background-color:#f1f5f9;">{tot_row_val:,.0f}</td></tr>'
+                            g_html += f'<td style="text-align:right; padding-right:12px; font-weight:700; background-color:#f1f5f9;">{tot_row_val:,.0f}</td></tr>'
 
                         g_html += '</tbody></table></div>'
                         st.markdown(g_html, unsafe_allow_html=True)
@@ -1223,6 +1221,7 @@ else:
 
     df_6_raw = df_6th_raw.copy()
     
+    # 📌 [수정 - 컬럼 자동 매핑 대폭 확장] 스크린샷 오인식 경고창 완벽 방지
     col_map_6th = {
         'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 ', 'Trip Month', 'TRIP_MONTH', 'MONTH'],
         '4.OD RGN': ['4.OD RGN', 'OD REGION', 'Region', 'OD 권역', '4. OD RGN', 'OD RGN', 'OD_REGION'],
@@ -1249,6 +1248,7 @@ else:
     for key, p_list in col_map_6th.items():
         actual_cols[key] = get_actual_col(df_6_raw, p_list)
 
+    # 📌 O&D 및 항공사 컬럼 자동 추정 보완
     if not actual_cols['OD ON/OFF']:
         for c in df_6_raw.columns:
             if any(x in c.upper() for x in ['OD', '노선', 'PAIR', 'O&D']):
@@ -1303,9 +1303,9 @@ else:
             al_order_6th.remove('KE')
             sorted_6th_airlines = ['KE'] + al_order_6th
         else:
-            sorted_6th_airlines = ['KE'] + al_order_6th
+            sorted_6th_airlines = al_order_6th
     else:
-        sorted_6th_airlines = ['KE']
+        sorted_6th_airlines = []
 
     all_raw_m = sorted([str(x) for x in df_6[month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
@@ -1329,7 +1329,7 @@ else:
 
         act_onoff_c = actual_cols['ON/OFF 여부']
         all_onoff_6 = sorted([str(x) for x in df_6[act_onoff_c].dropna().unique()]) if act_onoff_c and act_onoff_c in df_6.columns else []
-        sel_6_onoff = render_slicer_box(r_col5, "5. 연계구분 (온/오프)", all_onoff_6, "slicer_onoff_6")
+        sel_6_onoff = render_slicer_box(r_col5, "5. ON/OFF 여부", all_onoff_6, "slicer_onoff_6")
 
         st.markdown("---")
         c6_d1, c6_d2, c6_d3 = st.columns(3)
@@ -1360,6 +1360,7 @@ else:
 
     filtered_6 = df_6[mask_6_base].copy()
 
+    # 📌 [요구사항 반영] 6수송 Raw 데이터 다운로드 버튼
     csv_6th = filtered_6.to_csv(index=False).encode('utf-8-sig')
     st.download_button(
         label="📥 필터링된 6수송 Raw Data (CSV) 전체 다운로드",
@@ -1407,7 +1408,7 @@ else:
                 top_airlines.remove('KE')
                 airline_rank_list = ['KE'] + top_airlines
             else:
-                airline_rank_list = ['KE'] + top_airlines
+                airline_rank_list = top_airlines
                 
             airline_rank_list = airline_rank_list[:21]
 
@@ -1416,7 +1417,7 @@ else:
             
             for idx, al_code in enumerate(airline_rank_list):
                 if al_code == 'KE':
-                    html_table += f'<th class="ke-header">★ KE (대한항공)</th>'
+                    html_table += f'<th class="ke-header">★ KE</th>'
                 else:
                     rank_num = idx if 'KE' in airline_rank_list and airline_rank_list.index('KE') < idx else idx + 1
                     html_table += f'<th class="carrier-header"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
@@ -1482,6 +1483,7 @@ else:
             df_chart_melt = df_chart_6.melt(id_vars=[al_col_6], value_vars=['Val_num', 'Val_PY_num'], var_name='Year', value_name='Volume')
             df_chart_melt['Year'] = df_chart_melt['Year'].map({'Val_num': '26년 (CY)', 'Val_PY_num': '25년 (PY)'})
 
+            # 📌 [요구사항 반영] 비교 차트 내 KE 막대 돋보이는 색상 & 주석 표출
             chart_color_map = {'26년 (CY)': '#0ea5e9', '25년 (PY)': '#cbd5e1'}
             fig_6_yoy = px.bar(
                 df_chart_melt, x=al_col_6, y='Volume', color='Year', barmode='group',
@@ -1491,6 +1493,7 @@ else:
             )
             fig_6_yoy.update_traces(texttemplate='%{y:,.0f}', textposition='outside')
             
+            # KE 막대에 상단 화살표/텍스트 강조 주석 추가
             ke_row_val = al_agg[al_agg[al_col_6] == 'KE']['Val_num'].sum() if 'KE' in al_agg[al_col_6].values else 0
             if ke_row_val > 0:
                 fig_6_yoy.add_annotation(
@@ -1504,32 +1507,14 @@ else:
             apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
-    # 📌 Carrier별 M/S 탭 (안전장치 적용)
     with tab6_2:
         st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
         if not filtered_6.empty and od_col_6 and od_col_6 in filtered_6.columns and al_col_6 and al_col_6 in filtered_6.columns:
             
-            carrier_sales_sum = filtered_6.groupby(al_col_6, observed=False)['Val_num'].sum().sort_values(ascending=False)
-            carrier_rank_ordered = [str(x) for x in carrier_sales_sum.index if pd.notnull(x)]
+            available_carriers = [c for c in sorted_6th_airlines if c != 'KE']
             
-            if 'KE' in carrier_rank_ordered:
-                carrier_rank_ordered.remove('KE')
-                final_carrier_opts = ['KE'] + carrier_rank_ordered
-            else:
-                final_carrier_opts = ['KE'] + carrier_rank_ordered
-
-            if not final_carrier_opts:
-                final_carrier_opts = ['KE']
-
-            st.write("**비교 분석할 항공사 선택 (KE 최우선 & 발매량 1위 순 정렬):**")
-            selected_carrier = st.radio(
-                "비교분석할 항공사 지정:",
-                options=final_carrier_opts,
-                index=0,
-                key="radio_carrier_horiz",
-                horizontal=True,
-                label_visibility="collapsed"
-            )
+            col_c1, _ = st.columns([2, 2])
+            selected_carrier = render_slicer_box(col_c1, "비교분석할 항공사 지정", available_carriers if available_carriers else sorted_6th_airlines, "slicer_carrier_sel")
 
             od_totals = filtered_6.groupby(od_col_6, observed=False)['Val_num'].sum().reset_index()
             od_totals = od_totals.sort_values(by='Val_num', ascending=False).head(30)
@@ -1540,21 +1525,19 @@ else:
             if not df_top.empty and top_od_list:
                 carrier_html = '<div class="yoy-table-container"><table class="yoy-table">'
                 carrier_html += '<thead><tr>'
-                carrier_html += '<th class="mkt-header" style="width:50px; text-align:center;" rowspan="2">순위</th>'
-                carrier_html += '<th class="mkt-header" style="width:140px; text-align:center;" rowspan="2">TOP O&D</th>'
-                
-                carrier_html += '<th class="mkt-header" colspan="2" style="text-align:center;">시장 전체</th>'
-                carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 발매량 ({selected_carrier})</th>'
-                carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 M/S ({selected_carrier})</th>'
-                carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">★ KE 발매량</th>'
-                carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">★ KE M/S</th>'
+                carrier_html += '<th class="mkt-header" style="width:40px;" rowspan="2">순위</th>'
+                carrier_html += '<th class="mkt-header" style="width:130px;" rowspan="2">TOP O&D</th>'
+                carrier_html += '<th class="mkt-header" colspan="3">시장 전체</th>'
+                carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 발매량 ({selected_carrier})</th>'
+                carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 M/S ({selected_carrier})</th>'
+                carrier_html += '<th class="ke-header" colspan="3">★ KE 발매량</th>'
+                carrier_html += '<th class="ke-header" colspan="3">★ KE M/S</th>'
                 carrier_html += '</tr><tr>'
-                
-                carrier_html += '<th class="mkt-header" style="text-align:center;">26년</th><th class="mkt-header" style="text-align:center;">YOY</th>'
-                carrier_html += '<th class="carrier-header" style="text-align:center;">26년</th><th class="carrier-header" style="text-align:center;">YOY</th>'
-                carrier_html += '<th class="carrier-header" style="text-align:center;">M/S</th><th class="carrier-header" style="text-align:center;">YOY</th>'
-                carrier_html += '<th class="ke-header" style="text-align:center;">26년</th><th class="ke-header" style="text-align:center;">YOY</th>'
-                carrier_html += '<th class="ke-header" style="text-align:center;">M/S</th><th class="ke-header" style="text-align:center;">YOY</th>'
+                carrier_html += '<th class="mkt-header">26년</th><th class="mkt-header">25년</th><th class="mkt-header">YOY</th>'
+                carrier_html += '<th class="carrier-header">26년</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
+                carrier_html += '<th class="carrier-header">M/S</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
+                carrier_html += '<th class="ke-header">26년</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
+                carrier_html += '<th class="ke-header">M/S</th><th class="ke-header">25년</th><th class="ke-header">YOY</th>'
                 carrier_html += '</tr></thead><tbody>'
 
                 for idx, od_name in enumerate(top_od_list, start=1):
@@ -1588,14 +1571,15 @@ else:
                     k_ms_diff_str = f'<span class="yoy-up">▲ {k_ms_diff:.1f}%p</span>' if k_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(k_ms_diff):.1f}%p</span>'
 
                     carrier_html += f'<tr>'
-                    carrier_html += f'<td style="text-align:center;">{idx}</td>'
-                    carrier_html += f'<td style="font-weight:600; text-align:center;">{od_name}</td>'
-                    carrier_html += f'<td style="text-align:center;"><b>{m_cy:,.0f}</b></td><td style="text-align:center;">{m_yoy_str}</td>'
-                    carrier_html += f'<td style="text-align:center;">{c_cy:,.0f}</td><td style="text-align:center;">{c_yoy_str}</td>'
-                    carrier_html += f'<td style="text-align:center;"><b>{c_ms_cy:.0f}%</b></td><td style="text-align:center;">{c_ms_diff_str}</td>'
+                    carrier_html += f'<td>{idx}</td>'
+                    carrier_html += f'<td style="font-weight:600; text-align:left; padding-left:10px;">{od_name}</td>'
+                    carrier_html += f'<td><b>{m_cy:,.0f}</b></td><td>{m_py:,.0f}</td><td>{m_yoy_str}</td>'
+                    carrier_html += f'<td>{c_cy:,.0f}</td><td>{c_py:,.0f}</td><td>{c_yoy_str}</td>'
+                    carrier_html += f'<td><b>{c_ms_cy:.0f}%</b></td><td>{c_ms_py:.0f}%</td><td>{c_ms_diff_str}</td>'
                     k_cy_display = f"{k_cy:,.0f}" if k_cy > 0 else "-"
-                    carrier_html += f'<td class="ke-cell" style="text-align:center;">{k_cy_display}</td><td class="ke-cell" style="text-align:center;">{k_yoy_str if k_cy>0 or k_py>0 else "-"}</td>'
-                    carrier_html += f'<td class="ke-cell" style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td class="ke-cell" style="text-align:center;">{k_ms_diff_str}</td>'
+                    k_py_display = f"{k_py:,.0f}" if k_py > 0 else "-"
+                    carrier_html += f'<td class="ke-cell">{k_cy_display}</td><td class="ke-cell">{k_py_display}</td><td class="ke-cell">{k_yoy_str if k_cy>0 or k_py>0 else "-"}</td>'
+                    carrier_html += f'<td class="ke-cell"><b>{k_ms_cy:.1f}%</b></td><td class="ke-cell">{k_ms_py:.1f}%</td><td class="ke-cell">{k_ms_diff_str}</td>'
                     carrier_html += '</tr>'
 
                 tot_m_cy = df_top['Val_num'].sum()
@@ -1620,11 +1604,11 @@ else:
 
                 carrier_html += '<tr class="row-summary">'
                 carrier_html += '<td colspan="2" style="text-align:center;">TOP 30 요약</td>'
-                carrier_html += f'<td style="text-align:center;">{tot_m_cy:,.0f}</td><td style="text-align:center;">{"▲" if tot_m_yoy>=0 else "▼"} {abs(tot_m_yoy):.0f}%</td>'
-                carrier_html += f'<td style="text-align:center;">{tot_c_cy:,.0f}</td><td style="text-align:center;">{"▲" if tot_c_yoy>=0 else "▼"} {abs(tot_c_yoy):.0f}%</td>'
-                carrier_html += f'<td style="text-align:center;">{tot_c_ms_cy:.0f}%</td><td style="text-align:center;">{"▲" if tot_c_ms_diff>=0 else "▼"} {abs(tot_c_ms_diff):.0f}%p</td>'
-                carrier_html += f'<td class="ke-cell" style="text-align:center;">{tot_k_cy:,.0f}</td><td class="ke-cell" style="text-align:center;">{"▲" if tot_k_yoy>=0 else "▼"} {abs(tot_k_yoy):.0f}%</td>'
-                carrier_html += f'<td class="ke-cell" style="text-align:center;">{tot_k_ms_cy:.1f}%</td><td class="ke-cell" style="text-align:center;">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
+                carrier_html += f'<td>{tot_m_cy:,.0f}</td><td>{tot_m_py:,.0f}</td><td>{"▲" if tot_m_yoy>=0 else "▼"} {abs(tot_m_yoy):.0f}%</td>'
+                carrier_html += f'<td>{tot_c_cy:,.0f}</td><td>{tot_c_py:,.0f}</td><td>{"▲" if tot_c_yoy>=0 else "▼"} {abs(tot_c_yoy):.0f}%</td>'
+                carrier_html += f'<td>{tot_c_ms_cy:.0f}%</td><td>{tot_c_ms_py:.0f}%</td><td>{"▲" if tot_c_ms_diff>=0 else "▼"} {abs(tot_c_ms_diff):.0f}%p</td>'
+                carrier_html += f'<td class="ke-cell">{tot_k_cy:,.0f}</td><td class="ke-cell">{tot_k_py:,.0f}</td><td class="ke-cell">{"▲" if tot_k_yoy>=0 else "▼"} {abs(tot_k_yoy):.0f}%</td>'
+                carrier_html += f'<td class="ke-cell">{tot_k_ms_cy:.1f}%</td><td class="ke-cell">{tot_k_ms_py:.1f}%</td><td class="ke-cell">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
                 carrier_html += '</tr>'
 
                 carrier_html += '</tbody></table></div>'
