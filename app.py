@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 테두리 회색 통일 & 둥근 스타일 CSS 서식
+# 📌 [수정 반영] 통일화된 둥근 표 서식, 회색 테두리, #cfe2f3 헤더 및 #efefef 소계 색상 적용
 st.markdown("""
 <style>
     :root {
@@ -125,13 +125,13 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 📌 모든 피벗 및 M/S 표 테두리 일괄 통일 (회색, 1px, 둥근 모서리) */
+    /* 📌 [표 서식 통일] 둥근 모서리, 회색 테두리(#cbd5e1) */
     .custom-piv-container, .yoy-table-container {
         width: 100%;
         overflow-x: auto;
         margin-bottom: 20px;
         border-radius: 8px;
-        border: 1px solid #cbd5e1;
+        border: 1px solid #cbd5e1 !important;
         box-shadow: 0 2px 6px rgba(0,0,0,0.04);
     }
     .custom-piv-table, .yoy-table {
@@ -141,27 +141,27 @@ st.markdown("""
         background-color: #ffffff;
         text-align: center !important;
     }
-    .custom-piv-table th.header-main, .yoy-table th {
+    
+    /* 📌 [헤더 색상 통일] #cfe2f3 적용 */
+    .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header {
+        background-color: #cfe2f3 !important;
+        color: #0f172a !important;
         padding: 8px 6px;
         border: 1px solid #cbd5e1 !important;
         font-weight: 700;
         text-align: center !important;
         white-space: nowrap;
     }
-    .yoy-table th.mkt-header {
-        background-color: #2b579a !important;
-        color: #ffffff !important;
-    }
-    .yoy-table th.carrier-header {
-        background-color: #0284c7 !important;
-        color: #ffffff !important;
-    }
+    
+    /* KE 헤더는 초록색 강조 고정 */
     .yoy-table th.ke-header {
         background-color: #16a34a !important;
         color: #ffffff !important;
         font-size: 13px !important;
         font-weight: 800 !important;
+        border: 1px solid #cbd5e1 !important;
     }
+    
     .custom-piv-table td, .yoy-table td {
         padding: 6px 10px;
         border: 1px solid #cbd5e1 !important;
@@ -177,14 +177,19 @@ st.markdown("""
         background-color: #f8fafc !important;
     }
     .yoy-table tr.row-title {
-        background-color: #f1f5f9;
+        background-color: #f8fafc;
         font-weight: bold;
         color: #0f172a;
     }
-    .yoy-table tr.row-summary {
-        background-color: #e2e8f0;
+    
+    /* 📌 [소계 색상 통일] #efefef 적용 */
+    .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary, .row-summary-total {
+        background-color: #efefef !important;
         font-weight: bold;
         color: #0f172a;
+    }
+    .custom-piv-table tr.row-group-header td, .yoy-table tr.row-summary td {
+        background-color: #efefef !important;
     }
     
     .yoy-up { color: #16a34a; font-weight: 700; }
@@ -211,7 +216,6 @@ uploaded_wt = st.sidebar.file_uploader("2. 가중치 파일 (CSV, ZIP)", type=['
 uploaded_sup = st.sidebar.file_uploader("3. 공급 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 uploaded_6th = st.sidebar.file_uploader("4. 6수송 데이터 (CSV, XLSX, ZIP)", type=['csv', 'xlsx', 'zip', 'parquet'])
 
-# 메모리 절감을 위한 캐싱 및 최적화
 def optimize_df(df_in):
     if df_in is None:
         return None
@@ -665,7 +669,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (📌 [수정 반영] 텍스트 간소화)
+    # 2. ✈️ 공급 M/S 탭
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -708,7 +712,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         sup_color_map = build_airline_color_map(sup_airlines)
 
-        # 📌 [수정 반영] 슬라이서 필터 텍스트 단정하게 간소화
         with st.expander("🔍 **공급 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
             
@@ -943,7 +946,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             rbd_html += '<thead><tr><th class="header-main" style="width:140px; text-align:center;">RBD 클래스</th>'
                             for wk in week_list:
                                 rbd_html += f'<th class="header-main">{wk}</th>'
-                            rbd_html += '<th class="header-main" style="background-color:#2b579a !important;">총합계</th></tr></thead><tbody>'
+                            rbd_html += '<th class="header-main">총합계</th></tr></thead><tbody>'
 
                             for rbd_code, rbd_row in piv_rbd.head(100).iterrows():
                                 rbd_html += f'<tr><td style="text-align:center; font-weight:700;">{rbd_code}</td>'
@@ -952,7 +955,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                     v_str = f"{v_num:,.0f}" if v_num > 0 else ""
                                     rbd_html += f'<td style="text-align:center;">{v_str}</td>'
                                 tot_v = rbd_row['총합계']
-                                rbd_html += f'<td style="text-align:center; font-weight:700; background-color:#f1f5f9;">{tot_v:,.0f}</td></tr>'
+                                rbd_html += f'<td style="text-align:center; font-weight:700; background-color:#efefef;">{tot_v:,.0f}</td></tr>'
 
                             rbd_html += '</tbody></table></div>'
                             st.markdown(rbd_html, unsafe_allow_html=True)
@@ -987,7 +990,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             ag_html += '<thead><tr><th class="header-main" style="width:160px; text-align:center;">항공사</th>'
                             for wk in week_list_ag:
                                 ag_html += f'<th class="header-main">{wk}</th>'
-                            ag_html += '<th class="header-main" style="background-color:#2b579a !important;">총 판매량</th></tr></thead><tbody>'
+                            ag_html += '<th class="header-main">총 판매량</th></tr></thead><tbody>'
 
                             for al_code, al_row in piv_ag_sub.head(100).iterrows():
                                 is_ke_flag = (al_code == 'KE')
@@ -999,7 +1002,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                     v_str = f"{v_num:,.0f}" if v_num > 0 else ""
                                     ag_html += f'<td style="text-align:center; {cell_style}">{v_str}</td>'
                                 tot_v = al_row['총합계']
-                                ag_html += f'<td style="text-align:center; font-weight:700; background-color:#f1f5f9; {cell_style}">{tot_v:,.0f}</td></tr>'
+                                ag_html += f'<td style="text-align:center; font-weight:700; background-color:#efefef; {cell_style}">{tot_v:,.0f}</td></tr>'
 
                             ag_html += '</tbody></table></div>'
                             st.markdown(ag_html, unsafe_allow_html=True)
@@ -1008,10 +1011,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
     # -------------------------------------------------------------
-    # 4. 👥 단체실적 탭 (📌 [수정 반영] 타이틀 및 3개 필터 구조 변경)
+    # 4. 👥 단체실적 탭
     # -------------------------------------------------------------
     with tab_34_4:
-        # 📌 제목 변경: 발매 - 항공사별/대리점별 단체 발매 현황
         st.subheader("👥 발매 - 항공사별/대리점별 단체 발매 현황")
         
         if df_iss_raw is None:
@@ -1020,7 +1022,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_grp_raw = process_iss_merged(df_iss_raw, df_wt_raw)
 
-        # 출발일 기준 향후 10일 고정 집계
         dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else None)
         
         if dep_date_col:
@@ -1029,7 +1030,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             target_future_dt = pd.to_datetime(future_10_days)
             df_grp_raw = df_grp_raw[(df_grp_raw['Date_Obj'] >= target_today_dt) & (df_grp_raw['Date_Obj'] <= target_future_dt)]
 
-        # 📌 [수정 반영] 필터 구성: 1. 노선, 2. 출발월, 3. 항공사
         with st.expander("🔍 **단체실적 검색 피벗 슬라이서 필터 설정**", expanded=True):
             gf_col1, gf_col2, gf_col3 = st.columns(3)
             
@@ -1049,7 +1049,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if g_month_col and sel_g_month_str != ALL_OPTION: mask_grp &= (df_grp_raw[g_month_col].astype(str) == sel_g_month_str)
         if sel_g_al_str != ALL_OPTION: mask_grp &= (df_grp_raw['Dominant Marketing Airline'].astype(str) == sel_g_al_str)
 
-        # GRP (단체) 승객분류 내부 고정
+        # GRP 조건 고정
         is_grp_cond = (
             ((df_grp_raw['Dominant Marketing Airline'] == '7C') & (df_grp_raw['O&D RBKD'] == 'V')) |
             ((df_grp_raw['Dominant Marketing Airline'] != '7C') & (df_grp_raw['O&D RBKD'] == 'G'))
@@ -1093,13 +1093,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         g_html += '<thead><tr>'
                         g_html += '<th class="header-main" style="width:80px; text-align:center;">순위</th>'
                         g_html += '<th class="header-main" style="text-align:center;">여행사(대리점)명</th>'
-                        g_html += '<th class="header-main" style="width:200px; text-align:center; background-color:#2b579a !important;">단체 예약 실적 (석)</th>'
+                        g_html += '<th class="header-main" style="width:200px; text-align:center;">단체 예약 실적 (석)</th>'
                         g_html += '</tr></thead><tbody>'
 
                         g_html += '<tr class="row-group-header">'
                         g_html += f'<td style="text-align:center;">-</td>'
                         g_html += f'<td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td>'
-                        g_html += f'<td style="text-align:center; background-color:#bfdbfe;"><b>{al_tot_val:,.0f}</b></td></tr>'
+                        g_html += f'<td style="text-align:center; background-color:#efefef;"><b>{al_tot_val:,.0f}</b></td></tr>'
 
                         for r_idx, ag_row in top_ag_sub.iterrows():
                             ag_name = ag_row['Travel Agency Name']
@@ -1190,7 +1190,6 @@ else:
         month_col_6 = actual_cols['TRIP MONTH']
         year_type_col = actual_cols['금전구분']
 
-        # 6수송 데이터를 26년(금년) 데이터로 엄격 필터링
         if year_type_col and year_type_col in df_6_raw.columns:
             is_cy_mask = df_6_raw[year_type_col].astype(str).str.contains('금년|CY|2026', na=False)
             is_py_mask = df_6_raw[year_type_col].astype(str).str.contains('전년|PY|2025', na=False)
@@ -1325,7 +1324,6 @@ else:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 📌 [수정 반영] Carrier별 M/S 섹션을 O&D 종합 탭 하단으로 통합 배치
     tab6_1, tab6_2 = st.tabs(["📊 O&D별 종합 M/S 분석 및 Carrier별 상세 비교", "📋 6수송 Raw Data View"])
 
     with tab6_1:
@@ -1411,7 +1409,6 @@ else:
 
         st.markdown("---")
         
-        # 📌 [수정 반영] 중복 라디오 버튼 제거 / 상단 슬라이서 '9. 항공사' 선택값 연동
         selected_carrier = sel_6_al
         display_carrier_label = selected_carrier if selected_carrier != ALL_OPTION else "전체 시장"
 
@@ -1490,7 +1487,7 @@ else:
                     carrier_html += f'<td class="ke-cell" style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td class="ke-cell" style="text-align:center;">{k_ms_diff_str}</td>'
                     carrier_html += '</tr>'
 
-                # TOP 30 요약행
+                # TOP 30 요약행 (배경색 #efefef 통일)
                 tot_m_cy = df_top['Val_num'].sum()
                 tot_m_py = df_top['Val_PY_num'].sum()
                 tot_m_yoy = ((tot_m_cy - tot_m_py) / tot_m_py * 100) if tot_m_py > 0 else 0
@@ -1524,7 +1521,7 @@ else:
                 carrier_html += f'<td class="ke-cell" style="text-align:center;">{tot_k_ms_cy:.1f}%</td><td class="ke-cell" style="text-align:center;">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
                 carrier_html += '</tr>'
 
-                # 전체 시장 총합 (Market Total) 요약행 표출
+                # 전체 시장 총합 (Market Total) 요약행 표출 (배경색 #efefef 통일)
                 mkt_all_cy = filtered_6['Val_num'].sum()
                 mkt_all_py = filtered_6['Val_PY_num'].sum()
                 mkt_all_yoy = ((mkt_all_cy - mkt_all_py) / mkt_all_py * 100) if mkt_all_py > 0 else 0
@@ -1549,7 +1546,7 @@ else:
                 mkt_k_ms_py = (mkt_k_py / mkt_all_py * 100) if mkt_all_py > 0 else 0
                 mkt_k_ms_diff = mkt_k_ms_cy - mkt_k_ms_py
 
-                carrier_html += '<tr class="row-group-header" style="background-color:#c7d2fe !important;">'
+                carrier_html += '<tr class="row-group-header" style="background-color:#efefef !important;">'
                 carrier_html += '<td colspan="2" style="text-align:center;">전체 시장 총합 (Market Total)</td>'
                 carrier_html += f'<td style="text-align:center;"><b>{mkt_all_cy:,.0f}</b></td><td style="text-align:center;">{"▲" if mkt_all_yoy>=0 else "▼"} {abs(mkt_all_yoy):.0f}%</td>'
                 carrier_html += f'<td style="text-align:center;"><b>{mkt_c_cy:,.0f}</b></td><td style="text-align:center;">{"▲" if mkt_c_yoy>=0 else "▼"} {abs(mkt_c_yoy):.0f}%</td>'
