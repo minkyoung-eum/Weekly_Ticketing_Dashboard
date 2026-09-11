@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (#cfe2f3 헤더, #efefef 소계, #cccccc Market Total, 파스텔 초록 KE)
+# 📌 고급 CSS 서식
 st.markdown("""
 <style>
     :root {
@@ -125,7 +125,6 @@ st.markdown("""
         border-radius: 4px;
     }
 
-    /* 📌 모든 표 테두리 일괄 통일 (회색 #cbd5e1, 1px, 둥근 모서리) */
     .custom-piv-container, .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -141,8 +140,6 @@ st.markdown("""
         background-color: #ffffff;
         text-align: center !important;
     }
-    
-    /* 📌 [헤더 색상 통일] #cfe2f3 적용 */
     .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header {
         background-color: #cfe2f3 !important;
         color: #0f172a !important;
@@ -152,8 +149,6 @@ st.markdown("""
         text-align: center !important;
         white-space: nowrap;
     }
-    
-    /* 📌 [요청 반영] KE 헤더 파스텔 초록색 (#dcfce7 / #15803d) */
     .yoy-table th.ke-header {
         background-color: #dcfce7 !important;
         color: #15803d !important;
@@ -161,15 +156,12 @@ st.markdown("""
         font-weight: 800 !important;
         border: 1px solid #cbd5e1 !important;
     }
-    
     .custom-piv-table td, .yoy-table td {
         padding: 6px 10px;
         border: 1px solid #cbd5e1 !important;
         color: #334155;
         text-align: center !important;
     }
-    
-    /* 📌 [요청 반영] KE 셀 파스텔 연초록 (#f0fdf4) */
     .yoy-table td.ke-cell, .yoy-table tr.ke-row {
         background-color: #f0fdf4 !important;
         font-weight: 800 !important;
@@ -183,8 +175,6 @@ st.markdown("""
         font-weight: bold;
         color: #0f172a;
     }
-    
-    /* 📌 [소계 색상] #efefef 적용 */
     .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary {
         background-color: #efefef !important;
         font-weight: bold;
@@ -193,8 +183,6 @@ st.markdown("""
     .custom-piv-table tr.row-group-header td, .yoy-table tr.row-summary td {
         background-color: #efefef !important;
     }
-
-    /* 📌 [요청 반영] 전체 시장 총합 (Market Total) 요약행 #cccccc 적용 */
     .row-summary-market-total, .row-summary-market-total td {
         background-color: #cccccc !important;
         font-weight: 800 !important;
@@ -678,7 +666,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭
+    # 2. ✈️ 공급 M/S 탭 (📌 [수정] 데이터 로드 즉시 KE 취항노선으로 필터링)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -688,6 +676,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_sup = df_sup_raw.copy()
         df_sup.columns = [c.strip() for c in df_sup.columns]
 
+        # 📌 [핵심 수정] 드롭다운 슬라이서 생성 전 'KE취항여부' 필터링 최우선 적용
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
         if sup_ke_col:
             df_sup = df_sup[df_sup[sup_ke_col].astype(str) == '취항'].reset_index(drop=True)
@@ -709,6 +698,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         else:
             df_sup['Flights_num'] = 1
 
+        # KE 취항 노선만으로 드롭다운 슬라이서 목록 생성
         sup_routes = df_sup.groupby('노선', observed=False)['Seats_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
         
         sup_month_col = '출발월' if '출발월' in df_sup.columns else ('출발 월' if '출발 월' in df_sup.columns else ('Travel Month' if 'Travel Month' in df_sup.columns else None))
@@ -1244,7 +1234,7 @@ else:
 
     all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
-    # 📌 [요청 반영] 6수송 피벗 슬라이서 정돈 (요청하신 8개 필드로 세련되게 배치)
+    # 📌 [요청 반영] 8개 핵심 필터 구성
     with st.expander("🔍 **6수송 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
         st.markdown("##### 📌 주요 분석 선택 피벗 슬라이서 (2026년 기준)")
         r_col1, r_col2, r_col3, r_col4 = st.columns(4)
@@ -1489,7 +1479,7 @@ else:
                     carrier_html += f'<td class="ke-cell" style="text-align:center;"><b>{k_ms_cy:.1f}%</b></td><td class="ke-cell" style="text-align:center;">{k_ms_diff_str}</td>'
                     carrier_html += '</tr>'
 
-                # TOP 30 요약행 (배경색 #efefef)
+                # TOP 30 요약행 (#efefef)
                 tot_m_cy = df_top['Val_num'].sum()
                 tot_m_py = df_top['Val_PY_num'].sum()
                 tot_m_yoy = ((tot_m_cy - tot_m_py) / tot_m_py * 100) if tot_m_py > 0 else 0
