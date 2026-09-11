@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (엑셀 슬라이서 스타일 스크롤 박스 구현 포함)
+# 📌 고급 CSS 서식 (피벗 슬라이서 스크롤 박스 서식)
 st.markdown("""
 <style>
     :root {
@@ -67,17 +67,6 @@ st.markdown("""
     }
     div[data-testid="stToggle"] input:checked + div {
         background-color: #0ea5e9 !important;
-    }
-
-    /* 📌 엑셀 피벗 슬라이서 형태의 커스텀 고정 height 스크롤 박스 서식 */
-    .slicer-box-container {
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 6px;
-        background-color: #f8fafc;
-        max-height: 140px;
-        overflow-y: auto;
-        margin-bottom: 10px;
     }
 
     .source-header-box {
@@ -302,10 +291,10 @@ def load_smart_file(uploaded_file):
 @st.cache_data(max_entries=2, ttl=3600)
 def load_data_from_disk():
     df_iss, df_wt, df_sup, df_6th = None, None, None, None
-    if os.path.exists('34수송_9월1주차_CSV_2.csv'):
+    if os.path.exists('34수송_9월2주차.csv'):
+        df_iss = pd.read_csv('34수송_9월2주차.csv', low_memory=False)
+    elif os.path.exists('34수송_9월1주차_CSV_2.csv'):
         df_iss = pd.read_csv('34수송_9월1주차_CSV_2.csv', low_memory=False)
-    elif os.path.exists('34수송_9월1주차_CSV.csv'):
-        df_iss = pd.read_csv('34수송_9월1주차_CSV.csv', low_memory=False)
     elif os.path.exists('Ticketing-test_2.csv'):
         df_iss = pd.read_csv('Ticketing-test_2.csv', low_memory=False)
         
@@ -314,8 +303,6 @@ def load_data_from_disk():
         
     if os.path.exists('공급_9월1주차_CSV.csv'):
         df_sup = pd.read_csv('공급_9월1주차_CSV.csv', low_memory=False)
-    elif os.path.exists('공급 (9월 1주).csv'):
-        df_sup = pd.read_csv('공급 (9월 1주).csv', low_memory=False)
     elif os.path.exists('공급.xlsx'):
         df_sup = pd.read_excel('공급.xlsx', sheet_name='공급_RAW')
         
@@ -342,6 +329,11 @@ def process_iss_merged(df_iss, df_wt):
 
     df.columns = [str(c).strip() for c in df.columns]
     df_wt_c.columns = [str(c).strip() for c in df_wt_c.columns]
+
+    # 📌 [수정] 데이터 로드 원천 함수 단계에서 KE취항여부 == '취항' 미취항 노선 즉시 완전 삭제
+    ke_service_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
+    if ke_service_col:
+        df = df[df[ke_service_col].astype(str) == '취항'].reset_index(drop=True)
 
     df['노선'] = df['노선'].astype(str).str.strip()
 
@@ -452,7 +444,6 @@ def format_dep_time(dep_val):
     except:
         return "2026-08-01 09:00:00", "2026-08-01 11:00:00"
 
-# 📌 엑셀 피벗 슬라이서 형태의 스크롤 박스 렌더링 함수
 def render_slicer_box(container, label, full_list, key_name):
     opts = [ALL_OPTION] + full_list
     container.markdown(f"<b>{label}</b>", unsafe_allow_html=True)
@@ -474,7 +465,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
     ])
 
     # -------------------------------------------------------------
-    # 1. 🎟️ 발매 M/S 탭 (KE 취항노선 엄격 고정)
+    # 1. 🎟️ 발매 M/S 탭
     # -------------------------------------------------------------
     with tab_34_1:
         if df_iss_raw is None or df_wt_raw is None:
@@ -482,11 +473,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.stop()
 
         merged_df = process_iss_merged(df_iss_raw, df_wt_raw)
-
-        # 📌 [요구사항 반영] 발매 데이터: KE 취항 노선만 단에서 완전 필터링 고정
-        ke_service_col = 'KE취항여부' if 'KE취항여부' in merged_df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in merged_df.columns else None)
-        if ke_service_col:
-            merged_df = merged_df[merged_df[ke_service_col].astype(str) == '취항'].reset_index(drop=True)
 
         week_col = '발매주차_일자' if '발매주차_일자' in merged_df.columns else ('발매 주차' if '발매 주차' in merged_df.columns else '발매주차')
         all_issue_weeks = sorted([str(x) for x in merged_df[week_col].dropna().unique()]) if week_col else []
@@ -512,7 +498,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             apply_weight_toggle = st.toggle("⚖️ 가중치 적용 M/S 산출", value=True)
             val_col = 'Weighted_Value' if apply_weight_toggle else 'Value'
 
-            # 📌 엑셀 피벗 슬라이서 박스 스타일 4열 구성
             f_col1, f_col2, f_col3, f_col4 = st.columns(4)
             sel_route_str = render_slicer_box(f_col1, "1. 노선 (KE취항/발매량순)", route_order_list, "slicer_route_iss")
             sel_week_str = render_slicer_box(f_col2, "2. 발매 주차 및 일자", all_issue_weeks, "slicer_week_iss") if week_col else ALL_OPTION
@@ -649,7 +634,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.markdown("---")
                 c3, c4, c5 = st.columns(3)
                 
-                # 📌 차트 3, 4, 5는 KE 데이터만 필터링하여 산출
                 ke_only_df = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']
                 
                 with c3:
@@ -739,7 +723,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (KE 취항노선 엄격 고정 & 차트 3,4 완벽 삭제)
+    # 2. ✈️ 공급 M/S 탭 (KE 취항노선 엄격 고정)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -749,7 +733,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_sup = df_sup_raw.copy()
         df_sup.columns = [c.strip() for c in df_sup.columns]
 
-        # 📌 [요구사항 반영] 공급 데이터: KE 취항 노선만 단에서 완전 필터링 고정
+        # 📌 [수정] 공급 데이터 원천 로드 즉시 KE취항여부 == '취항' 미취항 노선 제거
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
         if sup_ke_col:
             df_sup = df_sup[df_sup[sup_ke_col].astype(str) == '취항'].reset_index(drop=True)
@@ -869,8 +853,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 sup_pivot_html += '</tbody></table></div>'
                 st.markdown(sup_pivot_html, unsafe_allow_html=True)
 
-            # 📌 [요구사항 반영] 기존 차트 3(출발 시간대별)과 차트 4(출발 월별) 완전히 삭제됨
-
             st.markdown("---")
             st.subheader("✈️ 항공사별 스케줄 타임라인")
             
@@ -928,10 +910,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.stop()
 
         df_agency = process_iss_merged(df_iss_raw, df_wt_raw)
-
-        ke_service_col_ag = 'KE취항여부' if 'KE취항여부' in df_agency.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_agency.columns else None)
-        if ke_service_col_ag:
-            df_agency = df_agency[df_agency[ke_service_col_ag].astype(str) == '취항'].reset_index(drop=True)
 
         week_col_a = '발매주차_일자' if '발매주차_일자' in df_agency.columns else ('발매 주차' if '발매 주차' in df_agency.columns else '발매주차')
 
@@ -1081,10 +1059,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.stop()
 
         df_grp_raw = process_iss_merged(df_iss_raw, df_wt_raw)
-
-        ke_service_col_grp = 'KE취항여부' if 'KE취항여부' in df_grp_raw.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_grp_raw.columns else None)
-        if ke_service_col_grp:
-            df_grp_raw = df_grp_raw[df_grp_raw[ke_service_col_grp].astype(str) == '취항'].reset_index(drop=True)
 
         dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else 'Ticket Purchase Date')
         df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
