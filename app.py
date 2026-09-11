@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식
+# 📌 [수정 반영] 컬럼 배경색 유지 + 하단 셀 배경 제거 + 회색 테두리 통일 CSS
 st.markdown("""
 <style>
     :root {
@@ -98,12 +98,12 @@ st.markdown("""
         margin-bottom: 10px;
     }
     .metric-card-ke {
-        background-color: #f0fdf4;
-        border: 1px solid #16a34a;
+        background-color: #ffffff;
+        border: 1px solid #cbd5e1;
         border-radius: 8px;
         padding: 14px;
         text-align: center;
-        box-shadow: 0 3px 6px rgba(22,163,74,0.12);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.03);
         margin-bottom: 10px;
     }
     .metric-title {
@@ -117,14 +117,8 @@ st.markdown("""
         color: #1e293b;
         font-weight: 700;
     }
-    .ke-highlight {
-        background-color: #dcfce7;
-        color: #15803d;
-        font-weight: bold;
-        padding: 2px 6px;
-        border-radius: 4px;
-    }
 
+    /* 📌 [표 서식 통일] 둥근 모서리, 회색 테두리(#cbd5e1) */
     .custom-piv-container, .yoy-table-container {
         width: 100%;
         overflow-x: auto;
@@ -140,7 +134,9 @@ st.markdown("""
         background-color: #ffffff;
         text-align: center !important;
     }
-    .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header {
+    
+    /* 📌 [컬럼 헤더 색상] #cfe2f3 적용 */
+    .custom-piv-table th.header-main, .yoy-table th, .yoy-table th.mkt-header, .yoy-table th.carrier-header, .yoy-table th.ke-header {
         background-color: #cfe2f3 !important;
         color: #0f172a !important;
         padding: 8px 6px;
@@ -149,32 +145,26 @@ st.markdown("""
         text-align: center !important;
         white-space: nowrap;
     }
-    .yoy-table th.ke-header {
-        background-color: #dcfce7 !important;
-        color: #15803d !important;
-        font-size: 13px !important;
-        font-weight: 800 !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-    .custom-piv-table td, .yoy-table td {
+    
+    /* 📌 [셀 배경 흰색/색상 제거] 일반 투명 셀로 통일 */
+    .custom-piv-table td, .yoy-table td, .yoy-table td.ke-cell, .yoy-table tr.ke-row {
         padding: 6px 10px;
         border: 1px solid #cbd5e1 !important;
-        color: #334155;
+        color: #334155 !important;
+        background-color: transparent !important;
         text-align: center !important;
     }
-    .yoy-table td.ke-cell, .yoy-table tr.ke-row {
-        background-color: #f0fdf4 !important;
-        font-weight: 800 !important;
-        color: #15803d !important;
-    }
+    
     .yoy-table tr:hover {
         background-color: #f8fafc !important;
     }
     .yoy-table tr.row-title {
-        background-color: #f8fafc;
+        background-color: #f8fafc !important;
         font-weight: bold;
         color: #0f172a;
     }
+    
+    /* 📌 [소계 배경] #efefef */
     .custom-piv-table tr.row-group-header, .yoy-table tr.row-summary {
         background-color: #efefef !important;
         font-weight: bold;
@@ -183,6 +173,8 @@ st.markdown("""
     .custom-piv-table tr.row-group-header td, .yoy-table tr.row-summary td {
         background-color: #efefef !important;
     }
+
+    /* 📌 [전체 시장 총합 배경] #cccccc */
     .row-summary-market-total, .row-summary-market-total td {
         background-color: #cccccc !important;
         font-weight: 800 !important;
@@ -666,7 +658,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (📌 [수정] 데이터 로드 즉시 KE 취항노선으로 필터링)
+    # 2. ✈️ 공급 M/S 탭 (📌 [수정] KE 취항 노선 우선 필터링)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -676,7 +668,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_sup = df_sup_raw.copy()
         df_sup.columns = [c.strip() for c in df_sup.columns]
 
-        # 📌 [핵심 수정] 드롭다운 슬라이서 생성 전 'KE취항여부' 필터링 최우선 적용
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
         if sup_ke_col:
             df_sup = df_sup[df_sup[sup_ke_col].astype(str) == '취항'].reset_index(drop=True)
@@ -698,7 +689,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         else:
             df_sup['Flights_num'] = 1
 
-        # KE 취항 노선만으로 드롭다운 슬라이서 목록 생성
         sup_routes = df_sup.groupby('노선', observed=False)['Seats_num'].sum().sort_values(ascending=False).index.astype(str).tolist()
         
         sup_month_col = '출발월' if '출발월' in df_sup.columns else ('출발 월' if '출발 월' in df_sup.columns else ('Travel Month' if 'Travel Month' in df_sup.columns else None))
@@ -1234,7 +1224,7 @@ else:
 
     all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
-    # 📌 [요청 반영] 8개 핵심 필터 구성
+    # 📌 8개 핵심 필터 구성
     with st.expander("🔍 **6수송 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
         st.markdown("##### 📌 주요 분석 선택 피벗 슬라이서 (2026년 기준)")
         r_col1, r_col2, r_col3, r_col4 = st.columns(4)
@@ -1260,12 +1250,10 @@ else:
         all_reg_6 = sorted([str(x) for x in df_6[act_reg_c].dropna().unique()]) if act_reg_c and act_reg_c in df_6.columns else []
         sel_6_region = render_slicer_box(c6_d1, "5. OD Region", all_reg_6, "slicer_reg_6")
 
-        # 📌 Sub-Route(소노선) 필드를 '일본노선' 라벨로 표출
         act_sub_c = actual_cols['Sub-Route']
         all_sub_6 = sorted([str(x) for x in df_6[act_sub_c].dropna().unique()]) if act_sub_c and act_sub_c in df_6.columns else []
         sel_6_jp_route = render_slicer_box(c6_d2, "6. 일본노선 (Sub-Route)", all_sub_6, "slicer_sub_6")
 
-        # 📌 Trip O&D Market 신규 필터 추가
         all_od_mkt_6 = sorted([str(x) for x in df_6[od_col_6].dropna().unique()]) if od_col_6 and od_col_6 in df_6.columns else []
         sel_6_od_mkt = render_slicer_box(c6_d3, "7. Trip O&D Market", all_od_mkt_6, "slicer_od_mkt_6")
 
@@ -1334,15 +1322,16 @@ else:
                 
             airline_rank_list = airline_rank_list[:5]
 
+            # 📌 [수정 반영] 각 항공사 컬럼 너비를 110px 고정 적용하여 균형감 확보
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
-            html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:100px;">총합계</th>'
+            html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:110px;">총합계</th>'
             
             for idx, al_code in enumerate(airline_rank_list):
                 if al_code == 'KE':
-                    html_table += f'<th class="ke-header">★ KE (대한항공)</th>'
+                    html_table += f'<th class="ke-header" style="width:110px;">KE (대한항공)</th>'
                 else:
                     rank_num = idx if 'KE' in airline_rank_list and airline_rank_list.index('KE') < idx else idx + 1
-                    html_table += f'<th class="carrier-header"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
+                    html_table += f'<th class="carrier-header" style="width:110px;"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
             html_table += '</tr></thead><tbody>'
 
             t_curr = al_agg['Val_num'].sum()
@@ -1415,6 +1404,7 @@ else:
             df_top = filtered_6[filtered_6[od_col_6].astype(str).isin(top_od_list)].copy()
 
             if not df_top.empty and top_od_list:
+                # 📌 [수정 반영] 별표(★) 제거된 KE 발매량 및 KE M/S 헤더 지정
                 carrier_html = '<div class="yoy-table-container"><table class="yoy-table">'
                 carrier_html += '<thead><tr>'
                 carrier_html += '<th class="mkt-header" style="width:50px; text-align:center;" rowspan="2">순위</th>'
@@ -1423,8 +1413,8 @@ else:
                 carrier_html += '<th class="mkt-header" colspan="2" style="text-align:center;">시장 전체</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 발매량 ({display_carrier_label})</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 M/S ({display_carrier_label})</th>'
-                carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">★ KE 발매량</th>'
-                carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">★ KE M/S</th>'
+                carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">KE 발매량</th>'
+                carrier_html += '<th class="ke-header" colspan="2" style="text-align:center;">KE M/S</th>'
                 carrier_html += '</tr><tr>'
                 
                 carrier_html += '<th class="mkt-header" style="text-align:center;">26년</th><th class="mkt-header" style="text-align:center;">YOY</th>'
@@ -1513,7 +1503,7 @@ else:
                 carrier_html += f'<td class="ke-cell" style="text-align:center;">{tot_k_ms_cy:.1f}%</td><td class="ke-cell" style="text-align:center;">{"▲" if tot_k_ms_diff>=0 else "▼"} {abs(tot_k_ms_diff):.1f}%p</td>'
                 carrier_html += '</tr>'
 
-                # 📌 [수정 반영] 전체 시장 총합 (Market Total) 요약행 배경색 #cccccc 적용
+                # 📌 전체 시장 총합 (Market Total) 요약행 배경색 #cccccc 적용
                 mkt_all_cy = filtered_6['Val_num'].sum()
                 mkt_all_py = filtered_6['Val_PY_num'].sum()
                 mkt_all_yoy = ((mkt_all_cy - mkt_all_py) / mkt_all_py * 100) if mkt_all_py > 0 else 0
