@@ -411,15 +411,14 @@ selected_group = st.radio(
 
 ALL_OPTION = "전체 (All)"
 
-# 📌 항공사별 고유 강조 색상 맵 생성 함수 (KE는 눈에 띄는 시안 블루, 타 항공사 일관된 고유색 할당)
 def build_airline_color_map(airlines_list):
     palette = px.colors.qualitative.Plotly + px.colors.qualitative.Bold + px.colors.qualitative.Pastel
-    cmap = {'KE': '#00A1E9'}  # KE 대한항공 선명 강조 시안 블루
+    cmap = {'KE': '#00A1E9'}
     idx = 0
     for al in airlines_list:
         if al != 'KE':
             color = palette[idx % len(palette)]
-            if color in ['#636EFA', '#00A1E9', '#0ea5e9']:  # KE와 중복 방지
+            if color in ['#636EFA', '#00A1E9', '#0ea5e9']:
                 idx += 1
                 color = palette[idx % len(palette)]
             cmap[al] = color
@@ -730,7 +729,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (KE 강조 및 파이차트-타임라인 색상 100% 일치 적용)
+    # 2. ✈️ 공급 M/S 탭
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -771,7 +770,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
 
-        # 📌 [핵심 개선] 공급 데이터에 존재하는 전체 항공사의 팔레트 색상 맵 생성 (KE 시안 블루 강조)
         sup_color_map = build_airline_color_map(sup_airlines)
 
         with st.expander("🔍 **공급 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
@@ -821,7 +819,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
             cs1, cs2 = st.columns([1, 1.2])
             with cs1:
                 pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
-                # 📌 파이차트에도 동일한 통합 색상 맵(sup_color_map) 적용
                 fig_s1 = px.pie(
                     pie_sup_al, values=target_val, names='Airline',
                     title='1. 항공사별 전체 공급 M/S 점유비', hole=0.4,
@@ -894,13 +891,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     df_schedule['Start_Time'] = [t[0] for t in time_tuples]
                     df_schedule['End_Time'] = [t[1] for t in time_tuples]
 
-                    # 📌 [핵심 개선] 타임라인 차트에 파이차트와 동일한 색상 맵(sup_color_map)을 직접 적용
                     fig_timeline = px.timeline(
                         df_schedule,
                         x_start="Start_Time", x_end="End_Time",
                         y="Airline", color="Airline", text="Airline",
                         title=f"[{selected_single_route}] 노선 하루 출발 시간대별 운항 스케줄 타임라인",
-                        color_discrete_map=sup_color_map,  # 파이 차트와 동일한 색상 매핑 적용
+                        color_discrete_map=sup_color_map,
                         category_orders={'Airline': sup_airlines}
                     )
                     fig_timeline.update_yaxes(autorange="reversed", title="항공사")
@@ -1059,7 +1055,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.warning("선택된 조건의 대리점 데이터가 없습니다.")
 
     # -------------------------------------------------------------
-    # 4. 👥 단체실적 탭
+    # 4. 👥 단체실적 탭 (날짜 필터 유연성 적용)
     # -------------------------------------------------------------
     with tab_34_4:
         st.subheader("👥 항공사별 / 대리점별 단체 실적 현황")
@@ -1070,13 +1066,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_grp_raw = process_iss_merged(df_iss_raw, df_wt_raw)
 
-        dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else ('출발일자' if '출발일자' in df_grp_raw.columns else 'Ticket Purchase Date')
-        df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
-        
-        target_today_dt = pd.to_datetime(today)
-        target_future_dt = pd.to_datetime(future_10_days)
-        
-        df_grp_raw = df_grp_raw[(df_grp_raw['Date_Obj'] >= target_today_dt) & (df_grp_raw['Date_Obj'] <= target_future_dt)]
+        # 📌 [핵심 수정] Dep Date/출발일자 컬럼 존재 시 금일~10일후 필터링, 없으면 전체 데이터 사용
+        if 'Dep Date' in df_grp_raw.columns or '출발일자' in df_grp_raw.columns:
+            dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else '출발일자'
+            df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
+            target_today_dt = pd.to_datetime(today)
+            target_future_dt = pd.to_datetime(future_10_days)
+            df_grp_raw = df_grp_raw[(df_grp_raw['Date_Obj'] >= target_today_dt) & (df_grp_raw['Date_Obj'] <= target_future_dt)]
+        else:
+            df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw['Ticket Purchase Date'].astype(str), errors='coerce')
 
         with st.expander("🔍 **단체실적 검색 피벗 슬라이서 필터 설정**", expanded=True):
             gf_col1, gf_col2, gf_col3 = st.columns(3)
@@ -1136,7 +1134,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 al_grp_sorted_list.remove('KE')
                 al_grp_sorted_list = ['KE'] + al_grp_sorted_list
 
-            st.markdown(f"##### 📌 항공사별 단체 실적 (DEP DATE: {today.strftime('%m/%d')} ~ {future_10_days.strftime('%m/%d')} / 대리점 열 300px 확장)")
+            st.markdown(f"##### 📌 항공사별 단체 실적 (대리점 열 300px 확장)")
 
             for al_code in al_grp_sorted_list:
                 al_df = df_grp_filtered[df_grp_filtered['Dominant Marketing Airline'] == al_code]
@@ -1158,7 +1156,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(50)
 
                         g_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
-                        g_html += '<thead><tr><th class="header-main" style="width:300px; text-align:left; padding-left:15px;">대리점명 (DEP DATE)</th>'
+                        g_html += '<thead><tr><th class="header-main" style="width:300px; text-align:left; padding-left:15px;">대리점명 (DATE)</th>'
                         
                         for d_col in date_col_list:
                             g_html += f'<th class="header-main">{d_col}</th>'
@@ -1183,7 +1181,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         g_html += '</tbody></table></div>'
                         st.markdown(g_html, unsafe_allow_html=True)
         else:
-            st.warning("선택된 조건(금일 ~ 향후 10일간)의 단체 실적 데이터가 없습니다.")
+            st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
 # GROUP 2: 🌐 6수송 대시보드
