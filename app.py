@@ -330,7 +330,6 @@ def process_iss_merged(df_iss, df_wt):
     df.columns = [str(c).strip() for c in df.columns]
     df_wt_c.columns = [str(c).strip() for c in df_wt_c.columns]
 
-    # 📌 [수정] 데이터 로드 원천 함수 단계에서 KE취항여부 == '취항' 미취항 노선 즉시 완전 삭제
     ke_service_col = 'KE취항여부' if 'KE취항여부' in df.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df.columns else None)
     if ke_service_col:
         df = df[df[ke_service_col].astype(str) == '취항'].reset_index(drop=True)
@@ -412,11 +411,19 @@ selected_group = st.radio(
 
 ALL_OPTION = "전체 (All)"
 
-def get_timeline_color_map(airlines_list):
-    cmap = {'KE': '#00A1E9'}
+# 📌 항공사별 고유 강조 색상 맵 생성 함수 (KE는 눈에 띄는 시안 블루, 타 항공사 일관된 고유색 할당)
+def build_airline_color_map(airlines_list):
+    palette = px.colors.qualitative.Plotly + px.colors.qualitative.Bold + px.colors.qualitative.Pastel
+    cmap = {'KE': '#00A1E9'}  # KE 대한항공 선명 강조 시안 블루
+    idx = 0
     for al in airlines_list:
         if al != 'KE':
-            cmap[al] = '#cbd5e1'
+            color = palette[idx % len(palette)]
+            if color in ['#636EFA', '#00A1E9', '#0ea5e9']:  # KE와 중복 방지
+                idx += 1
+                color = palette[idx % len(palette)]
+            cmap[al] = color
+            idx += 1
     return cmap
 
 def apply_bottom_legend(fig):
@@ -723,7 +730,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     st.info("ℹ️ Raw Data View 및 CSV 다운로드는 관리자 비밀번호 인증 후 이용하실 수 있습니다.")
 
     # -------------------------------------------------------------
-    # 2. ✈️ 공급 M/S 탭 (KE 취항노선 엄격 고정)
+    # 2. ✈️ 공급 M/S 탭 (KE 강조 및 파이차트-타임라인 색상 100% 일치 적용)
     # -------------------------------------------------------------
     with tab_34_2:
         if df_sup_raw is None:
@@ -733,7 +740,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
         df_sup = df_sup_raw.copy()
         df_sup.columns = [c.strip() for c in df_sup.columns]
 
-        # 📌 [수정] 공급 데이터 원천 로드 즉시 KE취항여부 == '취항' 미취항 노선 제거
         sup_ke_col = 'KE취항여부' if 'KE취항여부' in df_sup.columns else ('KE취항노선 여부' if 'KE취항노선 여부' in df_sup.columns else None)
         if sup_ke_col:
             df_sup = df_sup[df_sup[sup_ke_col].astype(str) == '취항'].reset_index(drop=True)
@@ -764,6 +770,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         raw_sup_al = sorted([str(x) for x in df_sup['Airline'].dropna().unique()])
         sup_airlines = ['KE'] + [x for x in raw_sup_al if x != 'KE'] if 'KE' in raw_sup_al else raw_sup_al
+
+        # 📌 [핵심 개선] 공급 데이터에 존재하는 전체 항공사의 팔레트 색상 맵 생성 (KE 시안 블루 강조)
+        sup_color_map = build_airline_color_map(sup_airlines)
 
         with st.expander("🔍 **공급 대시보드 피벗 슬라이서 필터 설정** (KE 취항노선 전용)", expanded=True):
             metric_mode = st.radio("📊 분석 공급 지표 선택:", options=["공급석 (Seats)", "운항 편수 (Flight Frequencies)"], horizontal=True)
@@ -812,10 +821,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
             cs1, cs2 = st.columns([1, 1.2])
             with cs1:
                 pie_sup_al = filtered_sup.groupby('Airline', observed=False)[target_val].sum().reset_index()
+                # 📌 파이차트에도 동일한 통합 색상 맵(sup_color_map) 적용
                 fig_s1 = px.pie(
                     pie_sup_al, values=target_val, names='Airline',
                     title='1. 항공사별 전체 공급 M/S 점유비', hole=0.4,
-                    category_orders={'Airline': sup_al_order}
+                    category_orders={'Airline': sup_al_order},
+                    color='Airline',
+                    color_discrete_map=sup_color_map
                 )
                 fig_s1.update_traces(textposition='inside', textinfo='percent+label', hovertemplate="<b>항공사: %{label}</b><br>공급량: %{value:,.0f}<br>점유율: %{percent:.1%}<extra></extra>")
                 apply_bottom_legend(fig_s1)
@@ -882,15 +894,13 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     df_schedule['Start_Time'] = [t[0] for t in time_tuples]
                     df_schedule['End_Time'] = [t[1] for t in time_tuples]
 
-                    active_al_list = df_schedule['Airline'].unique().tolist()
-                    dynamic_gray_cmap = get_timeline_color_map(active_al_list)
-
+                    # 📌 [핵심 개선] 타임라인 차트에 파이차트와 동일한 색상 맵(sup_color_map)을 직접 적용
                     fig_timeline = px.timeline(
                         df_schedule,
                         x_start="Start_Time", x_end="End_Time",
                         y="Airline", color="Airline", text="Airline",
                         title=f"[{selected_single_route}] 노선 하루 출발 시간대별 운항 스케줄 타임라인",
-                        color_discrete_map=dynamic_gray_cmap,
+                        color_discrete_map=sup_color_map,  # 파이 차트와 동일한 색상 매핑 적용
                         category_orders={'Airline': sup_airlines}
                     )
                     fig_timeline.update_yaxes(autorange="reversed", title="항공사")
