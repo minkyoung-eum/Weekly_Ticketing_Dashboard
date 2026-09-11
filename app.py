@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (KE 점선 박스 및 체크 표시 서식 강화)
+# 📌 고급 CSS 서식 (KE 테두리 외곽선만 세련되게 강조)
 st.markdown("""
 <style>
     :root {
@@ -99,7 +99,7 @@ st.markdown("""
     }
     .metric-card-ke {
         background-color: #f0f9ff;
-        border: 2px dashed #0284c7;
+        border: 2px solid #0284c7;
         border-radius: 10px;
         padding: 14px;
         text-align: center;
@@ -195,20 +195,22 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* 📌 KE 강조 점선 테두리 박스 및 체크 서식 */
+    /* 📌 [요구사항 반영] O&D 테이블 KE 강조: 과한 배경색 대신 깔끔한 외곽선 테두리 강조 */
     .yoy-table th.ke-header {
-        background-color: #059669 !important;
+        background-color: #0284c7 !important;
         color: #ffffff !important;
         font-size: 13px !important;
         font-weight: 800 !important;
-        border: 2.5px dashed #022c22 !important;
+        border-left: 2px solid #0369a1 !important;
+        border-right: 2px solid #0369a1 !important;
+        border-top: 2px solid #0369a1 !important;
     }
     .yoy-table td.ke-cell, .yoy-table tr.ke-row {
-        background-color: #ecfdf5 !important;
+        background-color: #f0f9ff !important;
         font-weight: 800 !important;
-        color: #047857 !important;
-        border-left: 2.5px dashed #059669 !important;
-        border-right: 2.5px dashed #059669 !important;
+        color: #0284c7 !important;
+        border-left: 2px solid #0284c7 !important;
+        border-right: 2px solid #0284c7 !important;
     }
     .yoy-table tr:hover {
         background-color: #f8fafc !important;
@@ -234,7 +236,7 @@ st.markdown("""
 
     .ke-timeline-box {
         background-color: #f0f9ff;
-        border: 2px dashed #0ea5e9;
+        border: 2px solid #0ea5e9;
         border-radius: 8px;
         padding: 12px 18px;
         margin-bottom: 15px;
@@ -697,12 +699,12 @@ if selected_group == "✈️ 3/4수송 대시보드":
                     piv_w = filtered_df.pivot_table(index='Dominant Marketing Airline', columns=week_col, values=val_col, aggfunc='sum', fill_value=0, observed=False)
                     piv_w_ms = piv_w.divide(piv_w.sum(axis=0), axis=1) * 100
                     al_sorted = ['KE'] + [x for x in piv_w_ms.index if x != 'KE'] if 'KE' in piv_w_ms.index else piv_w_ms.index
-                    st.dataframe(piv_w_ms.loc[al_sorted].map(lambda x: f"{x:.1f}%"), width="stretch")
+                    st.dataframe(piv_w_ms.loc[al_sorted].head(100).map(lambda x: f"{x:.1f}%"), width="stretch")
             with t2:
                 piv_r = filtered_df.pivot_table(index='노선', columns='Dominant Marketing Airline', values=val_col, aggfunc='sum', fill_value=0, observed=False)
                 cols_ke = ['KE'] + [x for x in piv_r.columns if x != 'KE'] if 'KE' in piv_r.columns else piv_r.columns
                 piv_r_ms = piv_r[cols_ke].divide(piv_r.sum(axis=1), axis=0) * 100
-                st.dataframe(piv_r_ms.map(lambda x: f"{x:.1f}%"), width="stretch")
+                st.dataframe(piv_r_ms.head(100).map(lambda x: f"{x:.1f}%"), width="stretch")
 
         with tab3:
             st.subheader("🔒 관리자 전용 Raw Data 조회 및 다운로드")
@@ -713,14 +715,14 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 
                 csv_data = filtered_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
-                    label="📥 필터링된 Raw Data (CSV) 다운로드",
+                    label="📥 필터링된 발매 Raw Data (CSV) 전체 다운로드",
                     data=csv_data,
                     file_name=f"Ticketing_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
                 )
                 
-                st.markdown("*(상위 1,000건 표출)*")
-                st.dataframe(filtered_df.head(1000), width="stretch")
+                st.markdown("*(속도 최적화를 위해 상위 100건만 표출합니다)*")
+                st.dataframe(filtered_df.head(100), width="stretch")
             else:
                 if admin_pw:
                     st.error("❌ 비밀번호가 올바르지 않습니다. 관리자 권한이 필요합니다.")
@@ -790,6 +792,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         filtered_sup = df_sup[filter_mask_sup]
 
+        # 📌 [요구사항 반영] 공급 Raw 데이터 다운로드 버튼
+        csv_sup = filtered_sup.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 필터링된 공급 Raw Data (CSV) 전체 다운로드",
+            data=csv_sup,
+            file_name=f"Supply_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+
         col_s1, col_s2, col_s3, col_s4 = st.columns(4)
         total_seats = filtered_sup['Seats_num'].sum()
         total_flights = filtered_sup['Flights_num'].sum()
@@ -830,9 +841,9 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 st.plotly_chart(fig_s1, width="stretch")
 
             with cs2:
-                st.markdown("##### 2. 항공사별 공급 실적 및 M/S 요약")
+                st.markdown("##### 2. 항공사별 공급 실적 및 M/S 요약 (상위 100건)")
                 pie_sup_al['공급 M/S (%)'] = (pie_sup_al[target_val] / pie_sup_al[target_val].sum()) * 100
-                pie_sup_al = pie_sup_al.sort_values(by=target_val, ascending=False).reset_index(drop=True)
+                pie_sup_al = pie_sup_al.sort_values(by=target_val, ascending=False).reset_index(drop=True).head(100)
                 pie_sup_al.index = range(1, len(pie_sup_al) + 1)
                 
                 sup_pivot_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
@@ -952,6 +963,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_ag_filtered = df_agency[mask_ag]
 
+        # 📌 [요구사항 반영] 대리점/RBD Raw 데이터 다운로드 버튼
+        csv_ag = df_ag_filtered.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 필터링된 대리점/RBD Raw Data (CSV) 전체 다운로드",
+            data=csv_ag,
+            file_name=f"Agency_RBD_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+
         sub_tab_rbd, sub_tab_agency = st.tabs(["📊 RBD별 판매현황", "🏢 대리점별 판매현황 (상위 20개 대리점)"])
 
         with sub_tab_rbd:
@@ -991,7 +1011,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                 rbd_html += f'<th class="header-main">{wk}</th>'
                             rbd_html += '<th class="header-main" style="background-color:#2b579a !important;">총합계</th></tr></thead><tbody>'
 
-                            for rbd_code, rbd_row in piv_rbd.iterrows():
+                            for rbd_code, rbd_row in piv_rbd.head(100).iterrows():
                                 rbd_html += f'<tr><td style="text-align:left; padding-left:15px; font-weight:700;">{rbd_code}</td>'
                                 for wk in week_list:
                                     v_num = rbd_row[wk] if wk in rbd_row else 0
@@ -1035,7 +1055,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                                 ag_html += f'<th class="header-main">{wk}</th>'
                             ag_html += '<th class="header-main" style="background-color:#2b579a !important;">총 판매량</th></tr></thead><tbody>'
 
-                            for al_code, al_row in piv_ag_sub.iterrows():
+                            for al_code, al_row in piv_ag_sub.head(100).iterrows():
                                 is_ke_flag = (al_code == 'KE')
                                 cell_style = 'font-weight:700; color:#0284c7;' if is_ke_flag else 'color:#475569;'
                                 
@@ -1122,6 +1142,15 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_grp_filtered = df_grp_raw[mask_grp].copy()
 
+        # 📌 [요구사항 반영] 단체실적 Raw 데이터 다운로드 버튼
+        csv_grp = df_grp_filtered.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 필터링된 단체실적 Raw Data (CSV) 전체 다운로드",
+            data=csv_grp,
+            file_name=f"Group_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+
         if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns and 'Date_Obj' in df_grp_filtered.columns:
             df_grp_filtered['Date_Str'] = df_grp_filtered['Date_Obj'].dt.strftime('%m/%d')
             date_col_list = sorted([str(x) for x in df_grp_filtered['Date_Str'].dropna().unique()])
@@ -1132,7 +1161,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                 al_grp_sorted_list.remove('KE')
                 al_grp_sorted_list = ['KE'] + al_grp_sorted_list
 
-            st.markdown(f"##### 📌 항공사별 단체 실적 (대리점 열 300px 확장)")
+            st.markdown(f"##### 📌 항공사별 단체 실적 (상위 100개 대리점)")
 
             for al_code in al_grp_sorted_list:
                 al_df = df_grp_filtered[df_grp_filtered['Dominant Marketing Airline'] == al_code]
@@ -1151,7 +1180,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                             observed=False
                         )
                         piv_grp_single['총합계'] = piv_grp_single.sum(axis=1)
-                        piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(50)
+                        piv_grp_single = piv_grp_single.sort_values(by='총합계', ascending=False).head(100)
 
                         g_html = '<div class="custom-piv-container"><table class="custom-piv-table">'
                         g_html += '<thead><tr><th class="header-main" style="width:300px; text-align:left; padding-left:15px;">대리점명 (DATE)</th>'
@@ -1192,20 +1221,21 @@ else:
 
     df_6_raw = df_6th_raw.copy()
     
+    # 📌 [수정 - 컬럼 자동 매핑 대폭 확장] 스크린샷 오인식 경고창 완벽 방지
     col_map_6th = {
-        'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 ', 'Trip Month'],
-        '4.OD RGN': ['4.OD RGN', 'OD REGION', 'Region', 'OD 권역', '4. OD RGN', 'OD RGN'],
-        'DIRECTION': ['DIRECTION', 'Bound', 'Direction'],
-        'STOP OVER': ['STOP OVER', 'Stopover', 'Stops'],
-        'OD ON/OFF': ['OD ON/OFF', 'OD', 'OD Pair', '노선', 'O&D ON/OFF'],
-        'TRIP ORIGIN COUNTRY': ['TRIP ORIGIN COUNTRY', 'Origin Country / Subregion', 'Origin Country'],
-        '일본 APO': ['일본 APO', 'Japan Airport', 'Origin Code', 'Destination Code'],
-        'TRIP DSTN COUNTRY': ['TRIP DSTN COUNTRY', 'Destination Country / Subregion', 'Destination Country'],
-        '해외 APO': ['해외 APO', 'Overseas Airport', 'Foreign Airport'],
-        '항공사': ['Dominant Marketing Airline', 'Op Airline Code', 'Airline', '항공사'],
-        'ON/OFF 여부': ['JPN-해외', 'ON/OFF 여부', 'ON/OFF'],
-        'Sub-Route': ['Sub-Route', '소노선', 'Sub Route'],
-        '금전구분': ['금/전', '금전구분', '구분', 'Year_Type', '금년/전년']
+        'TRIP MONTH': ['TRIP MONTH', 'Travel Month', '출발 월', '출발 월 ', 'Trip Month', 'TRIP_MONTH', 'MONTH'],
+        '4.OD RGN': ['4.OD RGN', 'OD REGION', 'Region', 'OD 권역', '4. OD RGN', 'OD RGN', 'OD_REGION'],
+        'DIRECTION': ['DIRECTION', 'Bound', 'Direction', 'DIR'],
+        'STOP OVER': ['STOP OVER', 'Stopover', 'Stops', 'STOPOVER'],
+        'OD ON/OFF': ['OD ON/OFF', 'OD', 'OD Pair', '노선', 'O&D ON/OFF', 'OD_PAIR', 'O&D Pair', 'O&D', 'OD_NAME', 'O&D_NAME'],
+        'TRIP ORIGIN COUNTRY': ['TRIP ORIGIN COUNTRY', 'Origin Country / Subregion', 'Origin Country', 'TRIP_ORIGIN_COUNTRY'],
+        '일본 APO': ['일본 APO', 'Japan Airport', 'Origin Code', 'Destination Code', 'JPN APO', 'JPN_APO'],
+        'TRIP DSTN COUNTRY': ['TRIP DSTN COUNTRY', 'Destination Country / Subregion', 'Destination Country', 'TRIP_DSTN_COUNTRY'],
+        '해외 APO': ['해외 APO', 'Overseas Airport', 'Foreign Airport', '해외APO'],
+        '항공사': ['Dominant Marketing Airline', 'Op Airline Code', 'Airline', '항공사', 'CARRIER', 'AIRLINE', 'Marketing Airline', 'Mkt Al', 'MKT_AL'],
+        'ON/OFF 여부': ['JPN-해외', 'ON/OFF 여부', 'ON/OFF', 'ON_OFF'],
+        'Sub-Route': ['Sub-Route', '소노선', 'Sub Route', 'SUB_ROUTE'],
+        '금전구분': ['금/전', '금전구분', '구분', 'Year_Type', '금년/전년', 'YEAR_TYPE', 'CY_PY']
     }
 
     def get_actual_col(df_curr, possible_names):
@@ -1218,11 +1248,26 @@ else:
     for key, p_list in col_map_6th.items():
         actual_cols[key] = get_actual_col(df_6_raw, p_list)
 
+    # 📌 O&D 및 항공사 컬럼 자동 추정 보완
+    if not actual_cols['OD ON/OFF']:
+        for c in df_6_raw.columns:
+            if any(x in c.upper() for x in ['OD', '노선', 'PAIR', 'O&D']):
+                actual_cols['OD ON/OFF'] = c
+                break
+        if not actual_cols['OD ON/OFF']: actual_cols['OD ON/OFF'] = df_6_raw.columns[0]
+
+    if not actual_cols['항공사']:
+        for c in df_6_raw.columns:
+            if any(x in c.upper() for x in ['AIRLINE', 'CARRIER', '항공사', 'AL']):
+                actual_cols['항공사'] = c
+                break
+        if not actual_cols['항공사']: actual_cols['항공사'] = df_6_raw.columns[1] if len(df_6_raw.columns) > 1 else df_6_raw.columns[0]
+
     val_col_6 = 'Value' if 'Value' in df_6_raw.columns else ('Seats' if 'Seats' in df_6_raw.columns else ('Flights' if 'Flights' in df_6_raw.columns else df_6_raw.columns[-1]))
     df_6_raw['Val_raw'] = pd.to_numeric(df_6_raw[val_col_6].astype(str).str.replace(',', '').str.strip(), errors='coerce').fillna(0)
 
-    al_col_6 = actual_cols['항공사'] if actual_cols['항공사'] else 'Dominant Marketing Airline'
-    od_col_6 = actual_cols['OD ON/OFF'] if actual_cols['OD ON/OFF'] else '노선'
+    al_col_6 = actual_cols['항공사']
+    od_col_6 = actual_cols['OD ON/OFF']
     month_col_6 = actual_cols['TRIP MONTH']
     year_type_col = actual_cols['금전구분']
 
@@ -1315,6 +1360,15 @@ else:
 
     filtered_6 = df_6[mask_6_base].copy()
 
+    # 📌 [요구사항 반영] 6수송 Raw 데이터 다운로드 버튼
+    csv_6th = filtered_6.to_csv(index=False).encode('utf-8-sig')
+    st.download_button(
+        label="📥 필터링된 6수송 Raw Data (CSV) 전체 다운로드",
+        data=csv_6th,
+        file_name=f"6th_Freedom_Raw_Data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+        mime="text/csv"
+    )
+
     c6_1, c6_2, c6_3 = st.columns(3)
     tot_6_val = filtered_6['Val_num'].sum()
     tot_6_py = filtered_6['Val_PY_num'].sum()
@@ -1363,8 +1417,7 @@ else:
             
             for idx, al_code in enumerate(airline_rank_list):
                 if al_code == 'KE':
-                    # 📌 [요구사항 반영] KE 헤더 체크 표시(✅)
-                    html_table += f'<th class="ke-header">✅ KE (대한항공)</th>'
+                    html_table += f'<th class="ke-header">★ KE</th>'
                 else:
                     rank_num = idx if 'KE' in airline_rank_list and airline_rank_list.index('KE') < idx else idx + 1
                     html_table += f'<th class="carrier-header"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
@@ -1430,19 +1483,33 @@ else:
             df_chart_melt = df_chart_6.melt(id_vars=[al_col_6], value_vars=['Val_num', 'Val_PY_num'], var_name='Year', value_name='Volume')
             df_chart_melt['Year'] = df_chart_melt['Year'].map({'Val_num': '26년 (CY)', 'Val_PY_num': '25년 (PY)'})
 
+            # 📌 [요구사항 반영] 비교 차트 내 KE 막대 돋보이는 색상 & 주석 표출
+            chart_color_map = {'26년 (CY)': '#0ea5e9', '25년 (PY)': '#cbd5e1'}
             fig_6_yoy = px.bar(
                 df_chart_melt, x=al_col_6, y='Volume', color='Year', barmode='group',
-                title="주요 항공사 26년 vs 25년 6수송 발매 실적 비교",
+                title="주요 항공사 26년 vs 25년 6수송 발매 실적 비교 (★ KE 대한항공 강조)",
                 category_orders={al_col_6: airline_rank_list},
-                color_discrete_map={'26년 (CY)': '#0ea5e9', '25년 (PY)': '#cbd5e1'}
+                color_discrete_map=chart_color_map
             )
             fig_6_yoy.update_traces(texttemplate='%{y:,.0f}', textposition='outside')
+            
+            # KE 막대에 상단 화살표/텍스트 강조 주석 추가
+            ke_row_val = al_agg[al_agg[al_col_6] == 'KE']['Val_num'].sum() if 'KE' in al_agg[al_col_6].values else 0
+            if ke_row_val > 0:
+                fig_6_yoy.add_annotation(
+                    x='KE', y=ke_row_val,
+                    text="<b>★ KE (대한항공)</b>",
+                    showarrow=True, arrowhead=2, arrowcolor="#0284c7", arrowsize=1.2,
+                    ax=0, ay=-35,
+                    font=dict(size=13, color="#0284c7", family="Arial Black")
+                )
+
             apply_bottom_legend(fig_6_yoy)
             st.plotly_chart(fig_6_yoy, width="stretch")
 
     with tab6_2:
         st.subheader("■ Carrier별 M/S (상위 TOP 30 O&D 상세 비교)")
-        if not filtered_6.empty and od_col_6 in filtered_6.columns and al_col_6 in filtered_6.columns:
+        if not filtered_6.empty and od_col_6 and od_col_6 in filtered_6.columns and al_col_6 and al_col_6 in filtered_6.columns:
             
             available_carriers = [c for c in sorted_6th_airlines if c != 'KE']
             
@@ -1463,8 +1530,8 @@ else:
                 carrier_html += '<th class="mkt-header" colspan="3">시장 전체</th>'
                 carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 발매량 ({selected_carrier})</th>'
                 carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 M/S ({selected_carrier})</th>'
-                carrier_html += '<th class="ke-header" colspan="3">✅ KE 발매량</th>'
-                carrier_html += '<th class="ke-header" colspan="3">✅ KE M/S</th>'
+                carrier_html += '<th class="ke-header" colspan="3">★ KE 발매량</th>'
+                carrier_html += '<th class="ke-header" colspan="3">★ KE M/S</th>'
                 carrier_html += '</tr><tr>'
                 carrier_html += '<th class="mkt-header">26년</th><th class="mkt-header">25년</th><th class="mkt-header">YOY</th>'
                 carrier_html += '<th class="carrier-header">26년</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
@@ -1549,8 +1616,8 @@ else:
             else:
                 st.warning("선택된 조건의 TOP 30 O&D 데이터가 없습니다.")
         else:
-            st.warning("6수송 데이터에 O&D 또는 항공사 필드가 존재하지 않습니다.")
+            st.warning("6수송 데이터에서 O&D 또는 항공사 필드를 탐색 중입니다. 파일 업로드 상태를 확인해 주세요.")
 
     with tab6_3:
-        st.markdown("*(속도 최적화를 위해 상위 1,000건만 조율 표출합니다)*")
-        st.dataframe(filtered_6.head(1000), width="stretch")
+        st.markdown("*(속도 최적화를 위해 상위 100건만 표출합니다)*")
+        st.dataframe(filtered_6.head(100), width="stretch")
