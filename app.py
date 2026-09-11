@@ -49,7 +49,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (피벗 슬라이서 스크롤 박스 서식)
+# 📌 고급 CSS 서식 (KE 점선 박스 및 체크 표시 서식 강화)
 st.markdown("""
 <style>
     :root {
@@ -99,7 +99,7 @@ st.markdown("""
     }
     .metric-card-ke {
         background-color: #f0f9ff;
-        border: 2px solid #38bdf8;
+        border: 2px dashed #0284c7;
         border-radius: 10px;
         padding: 14px;
         text-align: center;
@@ -194,22 +194,21 @@ st.markdown("""
         background-color: #0284c7 !important;
         color: #ffffff !important;
     }
+    
+    /* 📌 KE 강조 점선 테두리 박스 및 체크 서식 */
     .yoy-table th.ke-header {
         background-color: #059669 !important;
         color: #ffffff !important;
         font-size: 13px !important;
         font-weight: 800 !important;
-    }
-    .yoy-table td {
-        padding: 5px 6px;
-        border: 1px solid #e2e8f0;
-        white-space: nowrap;
-        color: #334155;
+        border: 2.5px dashed #022c22 !important;
     }
     .yoy-table td.ke-cell, .yoy-table tr.ke-row {
         background-color: #ecfdf5 !important;
         font-weight: 800 !important;
         color: #047857 !important;
+        border-left: 2.5px dashed #059669 !important;
+        border-right: 2.5px dashed #059669 !important;
     }
     .yoy-table tr:hover {
         background-color: #f8fafc !important;
@@ -235,7 +234,7 @@ st.markdown("""
 
     .ke-timeline-box {
         background-color: #f0f9ff;
-        border: 2px solid #0ea5e9;
+        border: 2px dashed #0ea5e9;
         border-radius: 8px;
         padding: 12px 18px;
         margin-bottom: 15px;
@@ -1066,7 +1065,6 @@ if selected_group == "✈️ 3/4수송 대시보드":
 
         df_grp_raw = process_iss_merged(df_iss_raw, df_wt_raw)
 
-        # Dep Date/출발일자 컬럼 존재 시 금일~10일후 필터링, 없으면 전체 데이터 사용
         if 'Dep Date' in df_grp_raw.columns or '출발일자' in df_grp_raw.columns:
             dep_date_col = 'Dep Date' if 'Dep Date' in df_grp_raw.columns else '출발일자'
             df_grp_raw['Date_Obj'] = pd.to_datetime(df_grp_raw[dep_date_col].astype(str), errors='coerce')
@@ -1184,7 +1182,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             st.warning("선택된 조건의 단체 실적 데이터가 없습니다.")
 
 # ==========================================
-# GROUP 2: 🌐 6수송 대시보드 (전년비 및 1:1 분리 집계 완전 개편)
+# GROUP 2: 🌐 6수송 대시보드
 # ==========================================
 else:
     st.subheader("🌐 6수송 OD별 발매량, M/S 및 전년비(YoY) 분석 대시보드")
@@ -1228,7 +1226,6 @@ else:
     month_col_6 = actual_cols['TRIP MONTH']
     year_type_col = actual_cols['금전구분']
 
-    # 📌 [핵심 개편] 금/전 분리 또는 TRAVEL MONTH 파싱으로 2026년(Val_num) vs 2025년(Val_PY_num) 1:1 파싱
     if year_type_col and year_type_col in df_6_raw.columns:
         is_cy_mask = df_6_raw[year_type_col].astype(str).str.contains('금년|CY|2026', na=False)
         is_py_mask = df_6_raw[year_type_col].astype(str).str.contains('전년|PY|2025', na=False)
@@ -1240,7 +1237,6 @@ else:
         is_cy_mask = pd.Series(True, index=df_6_raw.index)
         is_py_mask = pd.Series(False, index=df_6_raw.index)
 
-    # 1:1 파싱 적용
     df_cy = df_6_raw[is_cy_mask].copy()
     df_cy['Val_num'] = df_cy['Val_raw']
     df_cy['Val_PY_num'] = 0.0
@@ -1346,7 +1342,6 @@ else:
 
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
-    # 📌 [독자 YOY 및 M/S 변동폭 정밀 표출]
     with tab6_1:
         st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (26년 실적 & 25년 전년비)")
         
@@ -1368,7 +1363,8 @@ else:
             
             for idx, al_code in enumerate(airline_rank_list):
                 if al_code == 'KE':
-                    html_table += f'<th class="ke-header">★ KE</th>'
+                    # 📌 [요구사항 반영] KE 헤더 체크 표시(✅)
+                    html_table += f'<th class="ke-header">✅ KE (대한항공)</th>'
                 else:
                     rank_num = idx if 'KE' in airline_rank_list and airline_rank_list.index('KE') < idx else idx + 1
                     html_table += f'<th class="carrier-header"><div style="font-size:10px; opacity:0.85;">{rank_num}위</div>{al_code}</th>'
@@ -1387,7 +1383,7 @@ else:
                 html_table += f'<td{cell_class}><b>{row_val:,.0f}</b></td>'
             html_table += '</tr>'
 
-            # ROW 2: YOY (발매) -> 독립 그룹핑 성장률
+            # ROW 2: YOY (발매)
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             t_yoy_icon = f'<span class="yoy-up">▲ {t_yoy_pct:.0f}%</span>' if t_yoy_pct >= 0 else f'<span class="yoy-down">▼ {abs(t_yoy_pct):.0f}%</span>'
             html_table += f'<td>{t_yoy_icon}</td>'
@@ -1411,7 +1407,7 @@ else:
                 html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) -> 독립 M/S 변동폭
+            # ROW 4: YOY (M/S %p)
             html_table += '<tr><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
             for al_code in airline_rank_list:
@@ -1467,8 +1463,8 @@ else:
                 carrier_html += '<th class="mkt-header" colspan="3">시장 전체</th>'
                 carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 발매량 ({selected_carrier})</th>'
                 carrier_html += f'<th class="carrier-header" colspan="3">선택 항공사 M/S ({selected_carrier})</th>'
-                carrier_html += '<th class="ke-header" colspan="3">KE 발매량</th>'
-                carrier_html += '<th class="ke-header" colspan="3">KE M/S</th>'
+                carrier_html += '<th class="ke-header" colspan="3">✅ KE 발매량</th>'
+                carrier_html += '<th class="ke-header" colspan="3">✅ KE M/S</th>'
                 carrier_html += '</tr><tr>'
                 carrier_html += '<th class="mkt-header">26년</th><th class="mkt-header">25년</th><th class="mkt-header">YOY</th>'
                 carrier_html += '<th class="carrier-header">26년</th><th class="carrier-header">25년</th><th class="carrier-header">YOY</th>'
