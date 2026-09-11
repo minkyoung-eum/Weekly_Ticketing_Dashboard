@@ -50,7 +50,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (KE 초록색 강조, 흰색 경계선 통일, M/S YOY 구분선 마감, 전체 가운데 정렬)
+# 📌 고급 CSS 서식
 st.markdown("""
 <style>
     :root {
@@ -277,7 +277,6 @@ def optimize_df(df_in):
             df_in[col] = df_in[col].astype('float32')
     return df_in
 
-# 다중 인코딩 자동 호환 지원 파일 로더
 @st.cache_data(max_entries=4, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
@@ -1095,7 +1094,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             all_g_bounds = sorted([str(x) for x in df_grp_raw[g_bound_col].dropna().unique()]) if g_bound_col else []
             sel_g_bound_str = render_slicer_box(gf_col2, "2. 수송 (TRFC / BOUND)", all_g_bounds, "slicer_bound_grp") if g_bound_col else ALL_OPTION
 
-            # 📌 [수정 - 요구사항 반영] 3. 승객 분류 기본값을 'GRP (단체)'로 고정 (index 1)
+            # 승객 분류 기본값을 'GRP (단체)'로 고정 (index 1)
             pass_opts = ["GRP (단체)", "IND (개인)"]
             sel_g_passenger_str = render_slicer_box(gf_col3, "3. 승객 분류", pass_opts, "slicer_pass_grp", default_idx=1)
 
@@ -1142,7 +1141,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
             mime="text/csv"
         )
 
-        # 📌 [수정 - 요구사항 반영] 날짜 컬럼 제거 및 항공사별/여행사별 단체 실적 단순화 집계
+        # 📌 [수정 완료] 변수명 al_tot_val 통일하여 NameError 완벽 처리
         if not df_grp_filtered.empty and 'Travel Agency Name' in df_grp_filtered.columns:
             st.markdown(f"##### 📌 항공사별 / 여행사(대리점)별 단체 실적 현황 (상위 100개 대리점)")
 
@@ -1176,7 +1175,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         g_html += '<tr class="row-group-header">'
                         g_html += f'<td style="text-align:center;">-</td>'
                         g_html += f'<td style="text-align:center; font-weight:800;">★ {al_code} 전체 총합계</td>'
-                        g_html += f'<td style="text-align:center; background-color:#bfdbfe;"><b>{al_total_val:,.0f}</b></td></tr>'
+                        g_html += f'<td style="text-align:center; background-color:#bfdbfe;"><b>{al_tot_val:,.0f}</b></td></tr>'
 
                         for r_idx, ag_row in top_ag_sub.iterrows():
                             ag_name = ag_row['Travel Agency Name']
@@ -1267,7 +1266,7 @@ else:
         month_col_6 = actual_cols['TRIP MONTH']
         year_type_col = actual_cols['금전구분']
 
-        # 📌 6수송 데이터를 26년(금년) 데이터로 엄격 필터링
+        # 6수송 데이터를 26년(금년) 데이터로 엄격 필터링
         if year_type_col and year_type_col in df_6_raw.columns:
             is_cy_mask = df_6_raw[year_type_col].astype(str).str.contains('금년|CY|2026', na=False)
             is_py_mask = df_6_raw[year_type_col].astype(str).str.contains('전년|PY|2025', na=False)
@@ -1316,7 +1315,7 @@ else:
     else:
         sorted_6th_airlines = ['KE']
 
-    # 📌 26년 월 데이터만 슬라이서 목록으로 표출
+    # 26년 월 데이터만 슬라이서 목록으로 표출
     all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
     with st.expander("🔍 **6수송 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
@@ -1406,7 +1405,6 @@ else:
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        # 섹션 제목 변경
         st.subheader("■ O&D별 항공사 발매량 및 M/S (상위 5개 항공사)")
         
         if not filtered_6.empty and al_col_6 in filtered_6.columns:
@@ -1420,10 +1418,8 @@ else:
             else:
                 airline_rank_list = ['KE'] + top_airlines
                 
-            # 상위 5개 항공사 고정 (KE + 상위 4개사)
             airline_rank_list = airline_rank_list[:5]
 
-            # KE 헤더 초록색 배경 지정 및 흰색 경계선 전면 적용
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:100px;">총합계</th>'
             
@@ -1472,7 +1468,7 @@ else:
                 html_table += f'<td{cell_class}><b>{ms_val:.0f}%</b></td>'
             html_table += '</tr>'
 
-            # ROW 4: YOY (M/S %p) -> M/S YOY 하단 수평 구분선 마감
+            # ROW 4: YOY (M/S %p)
             html_table += '<tr class="row-ms-yoy"><td style="color:#64748b; font-weight:600;">YOY</td>'
             html_table += '<td><span class="yoy-up">▲ 0%p</span></td>'
             for al_code in airline_rank_list:
@@ -1492,7 +1488,6 @@ else:
             st.markdown("---")
             st.markdown("##### 2. 월별 발매량 / M/S 추이 차트 (KE 및 상위 5개사, 이중 축 구성)")
             
-            # 2. 월별 발매량/ms 이중 축 차트 (x축: TRIP MONTH 26년)
             if month_col_6 and month_col_6 in filtered_6.columns:
                 df_m_chart = filtered_6[filtered_6[al_col_6].isin(airline_rank_list)].copy()
                 
@@ -1506,7 +1501,7 @@ else:
                 fig_dual = make_subplots(specs=[[{"secondary_y": True}]])
 
                 color_dict_5 = {
-                    'KE': '#16a34a',  # KE 초록색 독립 강조
+                    'KE': '#16a34a',
                     'NH': '#0284c7',
                     'JL': '#2563eb',
                     'CX': '#0891b2',
@@ -1514,7 +1509,7 @@ else:
                     'MU': '#7c3aed'
                 }
 
-                # 1) y1축: 발매량 (Line Chart 선 그래프)
+                # 1) y1축: 발매량 (Line Chart)
                 for al_c in airline_rank_list:
                     sub_al_df = m_grp[m_grp[al_col_6] == al_c]
                     al_color = color_dict_5.get(al_c, '#64748b')
@@ -1532,7 +1527,7 @@ else:
                         secondary_y=False
                     )
 
-                # 2) y2축: M/S (%) (Bar/Scatter 그래프)
+                # 2) y2축: M/S (%) (Bar)
                 for al_c in airline_rank_list:
                     sub_al_df = m_grp[m_grp[al_col_6] == al_c]
                     al_color = color_dict_5.get(al_c, '#64748b')
@@ -1574,7 +1569,6 @@ else:
             if not final_carrier_opts:
                 final_carrier_opts = ['KE']
 
-            # 타이틀 문구 '항공사 선택'으로 명료화
             st.write("**항공사 선택:**")
             selected_carrier = st.radio(
                 "항공사 선택:",
@@ -1598,7 +1592,6 @@ else:
                 carrier_html += '<th class="mkt-header" style="width:50px; text-align:center;" rowspan="2">순위</th>'
                 carrier_html += '<th class="mkt-header" style="width:140px; text-align:center;" rowspan="2">TOP O&D Market</th>'
                 
-                # 25년 필드 제거 및 전체 중앙 정렬 / 흰색 경계선 통일
                 carrier_html += '<th class="mkt-header" colspan="2" style="text-align:center;">시장 전체</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 발매량 ({selected_carrier})</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 M/S ({selected_carrier})</th>'
@@ -1643,7 +1636,6 @@ else:
                     k_ms_diff = k_ms_cy - k_ms_py
                     k_ms_diff_str = f'<span class="yoy-up">▲ {k_ms_diff:.1f}%p</span>' if k_ms_diff >= 0 else f'<span class="yoy-down">▼ {abs(k_ms_diff):.1f}%p</span>'
 
-                    # 25년 컬럼 제외, 전체 중앙 정렬, 파란색 테두리 제거 및 KE 초록색 셀 강조
                     carrier_html += f'<tr>'
                     carrier_html += f'<td style="text-align:center;">{idx}</td>'
                     carrier_html += f'<td style="font-weight:600; text-align:center;">{od_name}</td>'
