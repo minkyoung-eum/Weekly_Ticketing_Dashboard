@@ -10,7 +10,7 @@ import zipfile
 
 # Page Config
 st.set_page_config(
-    page_title="항공사 노선별 통합 M/S 분석 대시보드 (3/4수송 & 6수송)",
+    page_title="일본노선 발매/공급 Market Share",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -50,7 +50,7 @@ RBD_HIERARCHY = {
     'WE': list('ADIZOYBMHEUQNTVW')
 }
 
-# 📌 고급 CSS 서식 (KE 초록색 강조, M/S YOY 구분선 마감, 테두리 제거 및 전체 가운데 정렬)
+# 📌 고급 CSS 서식 (KE 초록색 강조, 흰색 경계선 통일, M/S YOY 구분선 마감, 전체 가운데 정렬)
 st.markdown("""
 <style>
     :root {
@@ -175,6 +175,8 @@ st.markdown("""
         border-radius: 8px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
+    
+    /* 📌 [수정 - 요구사항 반영] 6수송 테이블 모든 구분선을 전면 흰색으로 통일 */
     .yoy-table {
         width: 100%;
         border-collapse: collapse;
@@ -185,7 +187,7 @@ st.markdown("""
     }
     .yoy-table th {
         padding: 8px 6px;
-        border: 1px solid #cbd5e1;
+        border: 1px solid #ffffff !important;
         font-weight: 700;
         white-space: nowrap;
         text-align: center !important;
@@ -199,25 +201,25 @@ st.markdown("""
         color: #ffffff !important;
     }
     
-    /* 📌 [요구사항 반영] KE 초록색 헤더 및 셀 서식 (테두리 제거 깔끔한 양식) */
+    /* 📌 [수정 - 요구사항 반영] KE 초록색 헤더 및 셀 서식 (흰색 테두리 양식) */
     .yoy-table th.ke-header {
         background-color: #16a34a !important;
         color: #ffffff !important;
         font-size: 13px !important;
         font-weight: 800 !important;
-        border: 1px solid #15803d !important;
+        border: 1px solid #ffffff !important;
     }
     .yoy-table td.ke-cell, .yoy-table tr.ke-row {
         background-color: #f0fdf4 !important;
         font-weight: 800 !important;
         color: #15803d !important;
-        border: 1px solid #dcfce7 !important;
+        border: 1px solid #ffffff !important;
         text-align: center !important;
     }
     .yoy-table td {
         text-align: center !important;
         padding: 6px 8px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #ffffff !important;
     }
     .yoy-table tr:hover {
         background-color: #f8fafc !important;
@@ -233,7 +235,7 @@ st.markdown("""
         color: #0f172a;
     }
     
-    /* 📌 [요구사항 반영] M/S YOY 하단 수평 구분선 완벽 마감 */
+    /* 📌 M/S YOY 하단 수평 구분선 마감 */
     .yoy-table tr.row-ms-yoy td {
         border-bottom: 2.5px solid #16a34a !important;
     }
@@ -282,6 +284,7 @@ def optimize_df(df_in):
             df_in[col] = df_in[col].astype('float32')
     return df_in
 
+# 다중 인코딩 자동 호환 지원 파일 로더
 @st.cache_data(max_entries=4, ttl=3600)
 def load_smart_file(uploaded_file):
     if uploaded_file is None:
@@ -414,8 +417,8 @@ def process_iss_merged(df_iss, df_wt):
 
     return optimize_df(merged_df)
 
-# Header Notice
-st.title("✈️ 항공사 노선별 통합 M/S 분석 대시보드")
+# 📌 [수정 - 요구사항 반영] 메인 타이틀 변경: 일본노선 발매/공급 Market Share
+st.title("✈️ 일본노선 발매/공급 Market Share")
 st.markdown(f"""
 <div class="source-header-box">
     <b>📌 출처: DDS & OAG 데이터</b> &nbsp;|&nbsp; 
@@ -498,6 +501,11 @@ if selected_group == "✈️ 3/4수송 대시보드":
         if df_iss_raw is None or df_wt_raw is None:
             st.info("👈 좌측 사이드바에서 [34수송_9월1주차_CSV_2.csv]와 [가중치 파일.csv]를 업로드해주세요.")
             st.stop()
+
+        # 📌 [수정 - 요구사항 반영] 3/4수송 발매 M/S 탭 상단 Raw Data Preview (상위 10개 행) 추가
+        with st.expander("📋 **3/4수송 발매 데이터 필드 구성 및 Raw Data Preview (상위 10개 행 미리보기)**", expanded=False):
+            st.markdown(f"**총 데이터 컬럼 ({len(df_iss_raw.columns)}개):** `{', '.join(df_iss_raw.columns.tolist())}`")
+            st.dataframe(df_iss_raw.head(10), width="stretch")
 
         merged_df = process_iss_merged(df_iss_raw, df_wt_raw)
 
@@ -654,7 +662,7 @@ if selected_group == "✈️ 3/4수송 대시보드":
                         st.plotly_chart(fig_week, width="stretch")
 
                 st.markdown("---")
-                # 📌 [수정 - 요구사항 반영] 5. 판매 채널별 점유비 그래프 삭제 후 2개 파이차트만 깔끔 표출
+                # 📌 [수정 - 요구사항 반영] 5. 판매 채널별 점유비 그래프 삭제 후 2개 파이차트만 표출
                 c3, c4 = st.columns(2)
                 
                 ke_only_df = merged_df[merged_df['Dominant Marketing Airline'] == 'KE']
@@ -1236,7 +1244,7 @@ else:
             '4.OD RGN': ['4.OD RGN', 'OD REGION', 'Region', 'OD 권역', '4. OD RGN', 'OD RGN', 'OD_REGION', '4.OD_RGN', 'ODREGION'],
             'DIRECTION': ['DIRECTION', 'Bound', 'Direction', 'DIR', 'BOUND'],
             'STOP OVER': ['STOP OVER', 'Stopover', 'Stops', 'STOPOVER', 'STOP_OVER'],
-            'OD ON/OFF': ['OD ON/OFF', 'OD', 'OD Pair', '노선', 'O&D ON/OFF', 'OD_PAIR', 'O&D Pair', 'O&D', 'OD_NAME', 'O&D_NAME', 'OD ON-OFF', 'OD_ON_OFF', 'O&D Market', 'OD Market'],
+            'OD ON/OFF': ['O&D Market', 'OD Market', 'OD ON/OFF', 'OD', 'OD Pair', '노선', 'O&D ON/OFF', 'OD_PAIR', 'O&D Pair', 'O&D', 'OD_NAME', 'O&D_NAME', 'OD ON-OFF', 'OD_ON_OFF'],
             'TRIP ORIGIN COUNTRY': ['TRIP ORIGIN COUNTRY', 'Origin Country / Subregion', 'Origin Country', 'TRIP_ORIGIN_COUNTRY', 'ORIGIN_COUNTRY'],
             '일본 APO': ['일본 APO', 'Japan Airport', 'Origin Code', 'Destination Code', 'JPN APO', 'JPN_APO', '일본APO'],
             'TRIP DSTN COUNTRY': ['TRIP DSTN COUNTRY', 'Destination Country / Subregion', 'Destination Country', 'TRIP_DSTN_COUNTRY', 'DSTN_COUNTRY'],
@@ -1257,7 +1265,7 @@ else:
         for key, p_list in col_map_6th.items():
             actual_cols[key] = get_actual_col(df_6_raw, p_list)
 
-        # 📌 [수정 - 요구사항 반영] TOP O&D Market 노선 구간명 우선 탐색
+        # 📌 TOP O&D Market 노선 구간명 우선 탐색
         if not actual_cols['OD ON/OFF']:
             for c in df_6_raw.columns:
                 if any(x in c.upper() for x in ['MARKET', 'OD', '노선', 'PAIR', 'O&D']):
@@ -1286,6 +1294,7 @@ else:
         month_col_6 = actual_cols['TRIP MONTH']
         year_type_col = actual_cols['금전구분']
 
+        # 📌 [수정 - 요구사항 반영] 6수송 데이터를 26년(금년) 데이터로 엄격 필터링
         if year_type_col and year_type_col in df_6_raw.columns:
             is_cy_mask = df_6_raw[year_type_col].astype(str).str.contains('금년|CY|2026', na=False)
             is_py_mask = df_6_raw[year_type_col].astype(str).str.contains('전년|PY|2025', na=False)
@@ -1334,13 +1343,14 @@ else:
     else:
         sorted_6th_airlines = ['KE']
 
-    all_raw_m = sorted([str(x) for x in df_6[month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
+    # 📌 [수정 - 요구사항 반영] 26년 월 데이터만 슬라이서 목록으로 표출
+    all_raw_m = sorted([str(x) for x in df_6[df_6['Val_num'] > 0][month_col_6].dropna().unique()]) if month_col_6 and month_col_6 in df_6.columns else []
 
     with st.expander("🔍 **6수송 대시보드 피벗 슬라이서 필터 설정**", expanded=True):
-        st.markdown("##### 📌 주요 분석 선택 피벗 슬라이서")
+        st.markdown("##### 📌 주요 분석 선택 피벗 슬라이서 (2026년 기준)")
         r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns(5)
         
-        sel_6_month = render_slicer_box(r_col1, "1. TRIP MONTH", all_raw_m, "slicer_m_6")
+        sel_6_month = render_slicer_box(r_col1, "1. TRIP MONTH (26년)", all_raw_m, "slicer_m_6")
 
         act_dir_c = actual_cols['DIRECTION']
         all_dir_6 = sorted([str(x) for x in df_6[act_dir_c].dropna().unique()]) if act_dir_c and act_dir_c in df_6.columns else []
@@ -1423,7 +1433,8 @@ else:
     tab6_1, tab6_2, tab6_3 = st.tabs(["📊 O&D별 종합 M/S 분석", "📌 Carrier별 M/S (TOP 30 O&D 상세)", "📋 6수송 Raw Data View"])
 
     with tab6_1:
-        st.subheader("■ O&D별 항공사 발매량 / M/S 종합 테이블 (상위 5개사 고정 & 25년 전년비)")
+        # 📌 [수정 - 요구사항 반영] 섹션 제목 변경: ■ O&D별 항공사 발매량 및 M/S (상위 5개 항공사)
+        st.subheader("■ O&D별 항공사 발매량 및 M/S (상위 5개 항공사)")
         
         if not filtered_6.empty and al_col_6 in filtered_6.columns:
             al_agg = filtered_6.groupby(al_col_6, observed=False)[['Val_num', 'Val_PY_num']].sum().reset_index()
@@ -1439,7 +1450,7 @@ else:
             # 상위 5개 항공사 고정 (KE + 상위 4개사)
             airline_rank_list = airline_rank_list[:5]
 
-            # 📌 [수정 - 요구사항 반영] KE 헤더 초록색 배경 지정 및 과도한 테두리 양식 정돈
+            # 📌 [수정 - 요구사항 반영] KE 초록색 헤더 배경 및 흰색 경계선 전면 적용
             html_table = '<div class="yoy-table-container"><table class="yoy-table">'
             html_table += '<thead><tr><th class="mkt-header" style="width:110px;">월별 M/S</th><th class="mkt-header" style="width:100px;">총합계</th>'
             
@@ -1508,11 +1519,10 @@ else:
             st.markdown("---")
             st.markdown("##### 2. 월별 발매량 / M/S 추이 차트 (KE 및 상위 5개사, 이중 축 구성)")
             
-            # 📌 [수정 - 요구사항 반영] 2. 월별 발매량/ms 이중 축 차트로 전면 개편
+            # 📌 [수정 - 요구사항 반영] 2. 월별 발매량/ms 이중 축 차트로 전면 개편 (x축: TRIP MONTH 26년)
             if month_col_6 and month_col_6 in filtered_6.columns:
                 df_m_chart = filtered_6[filtered_6[al_col_6].isin(airline_rank_list)].copy()
                 
-                # 월별/항공사별 집계
                 m_grp = df_m_chart.groupby([month_col_6, al_col_6], observed=False)['Val_num'].sum().reset_index()
                 m_totals = df_m_chart.groupby(month_col_6, observed=False)['Val_num'].sum().to_dict()
                 m_grp['Month_Total'] = m_grp[month_col_6].map(m_totals)
@@ -1565,7 +1575,7 @@ else:
                         secondary_y=True
                     )
 
-                fig_dual.update_xaxes(title_text="TRIP MONTH (월별)")
+                fig_dual.update_xaxes(title_text="TRIP MONTH (2026년 월별)")
                 fig_dual.update_yaxes(title_text="<b>발매량 (Volume)</b>", secondary_y=False)
                 fig_dual.update_yaxes(title_text="<b>M/S 점유율 (%)</b>", secondary_y=True, range=[0, 100])
 
@@ -1592,7 +1602,7 @@ else:
                 final_carrier_opts = ['KE']
 
             # 📌 [수정 - 요구사항 반영] 타이틀 문구 '항공사 선택'으로 명료화
-            st.write("**항공사 선택 (KE 최우선 & 발매량 1위 순 정렬):**")
+            st.write("**항공사 선택:**")
             selected_carrier = st.radio(
                 "항공사 선택:",
                 options=final_carrier_opts,
@@ -1615,6 +1625,7 @@ else:
                 carrier_html += '<th class="mkt-header" style="width:50px; text-align:center;" rowspan="2">순위</th>'
                 carrier_html += '<th class="mkt-header" style="width:140px; text-align:center;" rowspan="2">TOP O&D Market</th>'
                 
+                # 📌 25년 필드 제거 및 전체 중앙 정렬 / 흰색 경계선 통일
                 carrier_html += '<th class="mkt-header" colspan="2" style="text-align:center;">시장 전체</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 발매량 ({selected_carrier})</th>'
                 carrier_html += f'<th class="carrier-header" colspan="2" style="text-align:center;">선택 항공사 M/S ({selected_carrier})</th>'
